@@ -160,6 +160,26 @@ answer was in the small print.
   crossed. At 10:46 it reads 10:52; a minute later that train is out of reach and
   it reads 10:57
 
+**The rule, worked through.** Timetable 15:53, 15:57, 16:01, 16:05, 16:09, 16:13
+with a 6-minute cutoff:
+
+| render time | skipped as unreachable | HERO | then |
+|---|---|---|---|
+| 15:50 | 15:53 (3m) | 15:57 | 16:01 |
+| 15:55 | 15:57 (2m) | 16:01 | 16:05 |
+| 16:00 | 16:01 (1m), 16:05 (5m) | 16:09 | 16:13 |
+
+That is all it does: at 15:50 the 15:53 train is 3 minutes off, the walk is 6, so
+it is not shown. Confirmed as the intended behaviour 2026-07-30.
+
+**Known limitation, deliberately left.** The filter is correct at the *instant* it
+renders, but the frame then sits on the glass for five minutes. A frame rendered at
+15:50 shows 15:57 as its hero; read at 15:54 that train is 3 minutes away and no
+longer catchable. Closing it would mean filtering on walk + refresh interval
+(6 + 5 = 11 min), which costs a whole departure from view — at 15:50 you would be
+shown 16:01 despite 15:57 still being makeable. Judged not worth the trade;
+revisit only if it actually causes a missed train.
+
 **Still open:**
 - [ ] **S** ⚠️ Check what the feed does late at night / during engineering works
       (does `Passes` go empty?) — the no-departures path is written but untested
@@ -502,14 +522,67 @@ fresh machine, because `set -euo pipefail` treated "no crontab yet" as fatal.
 screen still readable after 4.5 years and ~3–4M updates.
 
 At 5 min over a 15-hour day = **180/day ≈ 65,700/year**. Even on the pessimistic
-1M rating that's **~15 years** — and the push guard means actual pushes land far
-under that.
+1M rating that's **~15 years**.
 
-The real costs are the **1–3 second black flash** per full refresh, and the fact
-that **nothing changes between OVapi polls** (10 min, to be polite to a free
-community server). With absolute times the frame is byte-identical between polls,
-so hashing and pushing only on change means the cadence costs nothing while a
-delayed train still shows up sooner than a fixed cycle allows.
+The real cost is the **1–3 second black flash** per full refresh.
+
+#### ⚠️ Correction 2026-07-30 — the frame is NOT static between polls
+
+This section used to claim that *"nothing changes between OVapi polls (10 min), so
+with absolute times the frame is byte-identical between polls."* **That was
+wrong**, and it is worth knowing why, because it produced a wrong prediction twice.
+
+**The cause is the timetable.** Trains run every 3–4 minutes at the home stop,
+and `metro.parse()` recomputes against `now` on every run rather than against the
+fetch. So the displayed pair rolls over as trains pass — *between* polls, not at
+them. Measured on the live feed by stepping `now` minute-by-minute across an hour:
+**a change roughly every 4 minutes**, against a 5-minute cron cadence.
+
+This has always been true. It is a property of living next to a frequent metro
+line and showing the next two departures, not of any code written recently.
+
+> **Not the walk filter.** The same sweep with the filter disabled gave 14 changes
+> per hour against 15 with it — noise. The filter shifts *when* a train leaves the
+> list, not how often. It is a display rule and has no bearing on refresh
+> frequency; the two were written up together once and that was confusing.
+
+**What this means, stated plainly:** the push guard works correctly, but it will
+**almost never skip during service hours**, because something genuinely changes
+nearly every run. The panel flashes about every 5 minutes, 07:00–22:00.
+
+The earlier `168 pushes / 0 skips` was therefore not *solely* the footer-stamp
+bug. That bug was real and worth fixing — the stamp came from `now()` and made
+every frame differ — but fixing it did not make the panel sit still, and saying so
+implied it would.
+
+Accepted as-is 2026-07-30: fresh metro times are the whole point of the screen,
+and the flash is a fair price on something you walk past.
+
+#### Rejected: DU partial refresh of the bottom band
+
+Proposed to kill the flashing, then **withdrawn on inspection**. Recorded so it is
+not re-proposed.
+
+**DU is a 2-level waveform — black and white only, no intermediate greys.** The
+decision row is built on greys: `MUTED` (102) for every metro destination, the
+`then` time, todo notes, weather advice, `+N more` and the inline appointment
+times; `DIVIDER` (153) for the rules and column separators. Under DU those snap to
+black or vanish. The hierarchy that `spacing_audit.py` and the baseline grid exist
+to protect only lives in the 16 greys `GC16` provides.
+
+Note the plumbing is *not* the obstacle — `AutoEPDDisplay.draw_partial()` already
+exists in the GregDMeyer library, so it would have been cheap to build. Cheap and
+wrong is worse than expensive and wrong.
+
+**If the flash ever does become annoying, try `GL16` / `GLD16` instead** — 16-grey
+waveforms with a gentler flash, intended for text on white. That is a one-line
+change to `DEFAULT_MODE` in `display.py`, with no partial-region logic and no
+ghosting schedule. ⚠️ Unverified that those modes exist in the installed driver
+(~85% confident; it only installs on the Pi). Check first with:
+
+```
+~/venv/bin/python -c "from IT8951 import constants; print([m for m in dir(constants.DisplayModes) if not m.startswith('_')])"
+```
 
 One useful side finding: "dark staining" in areas of **static** imagery is a real
 ageing mechanism. Because every push is a full refresh, every pixel is exercised
@@ -622,6 +695,7 @@ check is the useful half — it covers the tools that need network or hardware.
 |---|---|
 | `preview.py` | ✅ the main one. `--live` now prints each task's leave-by note |
 | `spacing_audit.py` | ✅ measures ink bands and flags tight gaps. Caught the to-do note at 6px |
+| `guard_check.py` | ✅ **new** — run twice, and it names which frame input changed |
 | `icon_sheet.py` | ✅ **repaired** — see below |
 | `art_veto.py` | ✅ **extended** with `--next N`, a contact sheet of upcoming picks |
 | `font_lab.py`, `font_specimen.py`, `label_lab.py`, `layout_lab.py` | ✅ typography/layout labs, all run |
