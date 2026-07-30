@@ -28,12 +28,7 @@ from exitscreen import eink, frame, theme  # noqa: E402
 OUT = ROOT / "out"
 
 PLEX_SANS = "IBMPlexSans[wdth,wght].ttf"
-JETBRAINS = "JetBrainsMono[wght].ttf"
-SPACE_GROTESK = "SpaceGrotesk[wght].ttf"
-DM_SANS = "DMSans[opsz,wght].ttf"
-DM_MONO = "DMMono-Medium.ttf"
 INSTRUMENT_SANS = "InstrumentSans[wdth,wght].ttf"
-INSTRUMENT_SERIF = "InstrumentSerif-Regular.ttf"
 ARCHIVO = "Archivo[wdth,wght].ttf"
 LITERATA = "Literata[opsz,wght].ttf"
 BRICOLAGE = "BricolageGrotesque[opsz,wdth,wght].ttf"

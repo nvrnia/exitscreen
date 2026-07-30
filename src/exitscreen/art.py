@@ -1,12 +1,8 @@
-﻿"""The daily art panel: a fallback chain in front of museum.py.
+"""The daily art panel: a fallback chain in front of museum.py.
 
 This module owns the *policy* - what to show when the ideal is unavailable -
 while museum.py owns fetching. daily() walks today's artwork, then yesterday's
 cached one, then a grey placeholder, so a front-door panel is never blank.
-
-placeholder() is deliberately plain. It is the floor of that chain, not a
-decorative fallback: if it is on the wall, something is wrong, and it should look
-like a gap rather than like a choice.
 """
 
 from __future__ import annotations
@@ -22,32 +18,23 @@ BOX_LABEL = "INSERT ART HERE"
 
 
 def daily(width: int, height: int, day: date | None = None):
-    """(image, Artwork|None) for today, with a fallback chain that cannot fail.
+    """(image, Artwork|None), falling back until something is showable.
 
-        today's artwork  ->  yesterday's cached one  ->  the grey placeholder
-
-    The panel is by a front door; it must always show something. A museum having
-    a bad night, or the wifi dropping, costs you a different picture - never a
-    blank rectangle.
+    today's artwork -> yesterday's cached one -> the grey placeholder. The panel
+    is by a front door and must always show something: a museum having a bad
+    night costs you a different picture, never a blank rectangle.
     """
     from . import museum
 
     day = day or date.today()
 
-    try:
-        image, artwork = museum.daily((width, height), day=day)
-        if image is not None:
-            return image, artwork
-    except Exception:
-        pass  # any failure falls through to the cached day below
-
-    # Yesterday's is already on disk and needs no network at all.
-    try:
-        image, artwork = museum.daily((width, height), day=day - timedelta(days=1))
-        if image is not None:
-            return image, artwork
-    except Exception:
-        pass
+    for attempt in (day, day - timedelta(days=1)):
+        try:
+            image, artwork = museum.daily((width, height), day=attempt)
+            if image is not None:
+                return image, artwork
+        except Exception:
+            continue  # yesterday's is already on disk and needs no network
 
     return placeholder(width, height), None
 

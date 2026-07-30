@@ -13,35 +13,34 @@ Size: **S** ≈ one sitting · **M** ≈ a session · **L** ≈ multiple session
 
 ## Where we are now
 
-*Last updated: 2026-07-27 — redesign built. Everything laptop-side is done.*
+*Last updated: 2026-07-30 — all four columns live, art included.*
 
-> ✅ **It is on the wall and running.** First light achieved 2026-07-27; the Pi
-> renders every 5 minutes from cron and pushes only when the image changes.
-> Remaining work is the daily art (Epic 6) and living with it.
+> ✅ **On the wall and running.** First light 2026-07-27. The Pi renders every 5
+> minutes from cron and pushes only when the image changes. Everything planned for
+> v1 is built; what's left is living with it.
 
 | column | state |
 |---|---|
-| METRO | ✅ live — real the home stop departures |
-| WEATHER | ✅ live — real the city conditions + umbrella rule |
-| TODO | ✅ live — real tasks from the "our to do" list |
-| ART | ⏸ procedural placeholder — real art parked by design |
-| PANEL | ✅ live — Pi 3A+ at <pi ip>, cron every 5 min |
+| METRO | ✅ live — reachable the home stop departures only, 6-min walk filter |
+| WEATHER | ✅ live — the city conditions, umbrella rule, adaptive rain bars |
+| TODO | ✅ live — "our to do" list, with leave-by times on timed tasks |
+| ART | ✅ live — a Cleveland Museum painting a day, with veto |
+| PANEL | ✅ live — Pi 3A+ on `exitscreen-pi.local`, cron every 5 min |
 
 See it:
 
 ```
-cd "C:\Users\jmand\Downloads\exitscreen"
 py tools/preview.py --live        # fetches real data, opens the viewer
 py tools/preview.py               # sample data, no network
 py tools/preview.py --no-show     # just write PNGs to out/
 ```
 
 Viewer keys: `1`/`2`/`3` reduction mode · `R` re-render · `S` save · `Q` quit.
-⚠️ The Tk viewer has never actually been run — only headless rendering has
-been verified. If it errors, the PNGs in `out/` still work.
+⚠️ The Tk viewer has still never actually been run — only headless rendering is
+verified. If it errors, the PNGs in `out/` still work.
 
-**The biggest untested assumption is still the panel.** Everything has been
-judged on a backlit monitor; e-ink is neither backlit nor high-contrast.
+**Now judged on real glass.** The panel is no longer the untested assumption; the
+open questions are the umbrella icon override and art contrast, both below.
 
 ---
 
@@ -59,10 +58,10 @@ rebuilt.
 - **`_WMO`** — which WMO codes map to which icon name. Reorder or resplit freely.
 - **`weather_name()`** — the umbrella override lives here (umbrella wins over
   the actual sky, deliberately).
-- **`draw_weather()`** — size and positioning. Note glyphs draw *wider* than
-  their nominal box, so changing the size may need the temperature offset in
-  `frame.py` (`x + 86`) adjusted to match.
-- **Size / placement of the whole column** is in `frame.py` → `_draw_weather()`.
+- **`draw_weather()`** — draws centred in a box. Glyphs render *wider* than their
+  nominal box, so changing the size may need the surrounding spacing rechecked.
+- **Size and position** are `WEATHER_ICON_SIZE` / `WEATHER_ICON_TOP` in `theme.py`;
+  the column's arrangement is `frame.py` → `_draw_weather()`.
 
 Tools:
 
@@ -97,7 +96,7 @@ slots in the font, not bugs.
 - [x] `theme.py` — geometry, greys, font roles (the single tuning surface)
 - [x] `icons.py` — WMO code mapping; weather from a bundled icon font,
       arrow + checkbox hand-drawn
-- [x] `art.py` — procedural placeholder scene
+- [x] `art.py` — the grey placeholder, and the fallback chain around it
 - [x] `frame.py` — `build_frame(data) → image`, pure, no platform imports
 - [x] `eink.py` — 256→16 grey reduction, plus 1-bit modes for comparison
 - [x] `tools/preview.py` — headless render + Tk viewer
@@ -183,13 +182,13 @@ revisit only if it actually causes a missed train.
 **Still open:**
 - [ ] **S** ⚠️ Check what the feed does late at night / during engineering works
       (does `Passes` go empty?) — the no-departures path is written but untested
-- [ ] **S** Consider shortening `the interchange` → `Centraal` for the strip
+- [ ] **S** Consider shortening `the terminus` → `Centraal` if the column gets tight
 - [ ] **S** Verify the numbers against the actual platform sign in person
 
-~~Decide how to render an imminent train (`0'` vs `now`)~~ — **moot.** The
-redesign switches to absolute times, which never go stale.
+~~Decide how to render an imminent train (`0'` vs `now`)~~ — **moot.** Absolute
+times never go stale.
 
-**Done when:** the strip shows real the home stop departures I can verify
+**Done when:** the column shows real the home stop departures I can verify
 against the platform sign.
 
 ---
@@ -230,82 +229,42 @@ against the platform sign.
 
 ---
 
-## EPIC 2.5 — Dashboard layout redesign 🔶 approved, not built
+## EPIC 2.5 — Dashboard layout redesign ✅ built
 
-Replaces the hero-art layout. Full plan and reasoning is in the approved plan
-file; this is the checklist.
+Replaced the hero-art layout with four bands: top bar, boxed art, a three-column
+decision row, footer. Geometry lives in `theme.py`, arrangement in `frame.py`.
 
-**Why:** `4'` starts lying the moment it's drawn — the panel refreshes every few
-minutes, so "in 4 minutes" can be long gone. `08:14` stays correct. That's a
-correctness fix, and it's what makes push-on-change possible.
+**Why absolute times:** `4'` starts lying the moment it is drawn — the panel
+refreshes every few minutes, so "in 4 minutes" can be long gone. `08:14` stays
+correct, and it is what makes push-on-change possible at all.
 
-```
-┌─────────────────────────────────────────────────┐
-│ SUN 26 JULY                                     │  ~46px
-├─────────────────────────────────────────────────┤
-│              ART (full bleed)                   │  ~371px  45%
-├─────────────────────────────────────────────────┤
-│ METRO        │ 20° → 23°   ☂ │ TODAY            │
-│ 08:14        │ ▁▁▃█▅▂        │ — Pick up parcel │  ~358px
-│ then 08:21   │ Rain 15:00    │ — Buy bread      │
-│ D → R'dam C. │ wind 6        │ +2 more          │
-├─────────────────────────────────────────────────┤
-│ OUR EXIT SCREEN                  updated 08:04  │  ~50px
-└─────────────────────────────────────────────────┘
-```
+**Typography: Literata (main) + Work Sans (supporting).** The rule is *serif is
+the panel's furniture, sans is the data hung on it* — serif for the date, column
+labels, clock, temperature and nameplate; sans for everything hung off them.
+Chosen by rendering 23 faces in the real layout, not by adjectives.
 
-- [x] ⚠️ **Beaufort table verified.** Memory was correct. km/h upper bounds:
-      `0:<1 · 1:5 · 2:11 · 3:19 · 4:28 · 5:38 · 6:49 · 7:61 · 8:74 · 9:88 ·
-      10:102 · 11:117 · 12:≥118`. Sources differ by ±1 at the 117/118 boundary;
-      irrelevant at the city wind speeds.
-      **Bonus:** Force 6 is officially described as *"umbrellas are hard to use"* —
-      a ready-made threshold for switching the umbrella advice to "take a coat"
-- [x] ⚠️ **Tabular figures confirmed unavailable.** `features=['tnum']` raises
-      `KeyError: ... not supported without libraqm`. Trap found:
-      `layout_engine=RAQM` is silently *accepted* and falls back to basic layout
-      with only a warning — so it looks like it worked
-- [x] **Digit widths measured instead** — and this changes the font shortlist:
-      **Inter (our current pick) has proportional digits** (`1`=24px vs `0`=40px
-      at 60pt), while **IBM Plex Sans is tabular by default** (0px jitter) and is
-      already bundled. Practical impact is modest since the column is
-      left-aligned — consecutive times differ ~4px — but across the day the big
-      numeral visibly breathes by up to 64px. **Mono is not required to fix this**
-- [x] `theme.py` — four-band geometry inside a hairline plate frame
-- [x] `frame.py` — split into `_draw_topbar` / art / `_draw_decision_row` /
-      `_draw_footer`. `_fit()` and per-column degradation kept
-- [x] `models.py` — `Departure.when`, `FrameData.fetched_at`, new `Weather` fields
-- [x] `metro.py` — absolute `HH:MM`. No new selection logic needed
-- [x] `weather.py` — `beaufort()`, rain series, `first_rain_at()`, gusts added to
-      the existing single call
-- [x] Adaptive weather: rain today (≥25%) → bars + small icon; otherwise enlarged
-      icon alone. Both states mocked up and approved before building
-- [x] Conditional wind: hidden when calm; Beaufort + gusts when notable
-- [x] `eink.py` — `frame_digest(img)`, verified against 5 cases
-- [x] `tools/font_lab.py` + `tools/font_specimen.py` — 23 faces compared
-
-**Typography — decided by looking, not by adjectives:**
-- **Literata** (main) + **Bricolage Grotesque** (supporting). Literata was
-  commissioned for e-reader screens, which is an unusually good fit for e-ink,
-  and gives the printed-plate feel the art bible asks for
-- The rule: **serif is the panel's furniture, sans is the data hung on it.**
-  Serif → date, `METRO`, `TODAY`, clock, temperature, nameplate.
-  Sans → second departure, destination, task text, rain line, `+N more`, stamp
+- Literata was commissioned for e-reader screens, an unusually good fit for e-ink
 - All-serif was tried first and rejected as too heavy
-- Rejected: every interface sans (Inter, Plex, DM, Instrument, Archivo, Atkinson)
-  as too corporate/generic — a fair criticism of a shortlist I had picked purely
-  on metrics rather than on the brief
-- Atkinson had a **missing `→` glyph** rendering as tofu, which is why the arrow
-  is now drawn as a vector. Typeface choice is no longer limited by glyph coverage
-- Both `→` arrows and the todo em-dash gap are now **measured, not hardcoded** —
-  a fixed offset jams text against the dash on wider faces
+- **Bricolage Grotesque was the first supporting pick and was dropped** — two
+  characterful faces competed instead of one supporting the other. Source Sans 3
+  meshed but measured narrowest of eleven candidates and read as cramped
+- Atkinson Hyperlegible rendered `→` as tofu, which is why **all arrows are drawn
+  as vectors**. Typeface choice is no longer limited by glyph coverage
 
-**Rejected on purpose:**
-- `LEAVE BY` with walk-time arithmetic — just the metro times
-- A live clock — see the refresh decisions below
-- All-serif typography — too much
+**Three findings worth not rediscovering:**
+- ⚠️ **Beaufort km/h upper bounds verified:** `1:5 · 2:11 · 3:19 · 4:28 · 5:38 ·
+  6:49 · 7:61 · 8:74 · 9:88 · 10:102 · 11:117`. Now the table in `weather.py`.
+  Force 6 is officially *"umbrellas are hard to use"* — a ready-made threshold
+- ⚠️ **Tabular figures are unavailable** without libraqm; `features=['tnum']`
+  raises `KeyError`. The trap: `layout_engine=RAQM` is silently *accepted* and
+  falls back to basic layout with only a warning, so it looks like it worked.
+  This is why `theme.load()` pins `Layout.BASIC` on both machines
+- Digit widths were measured instead. Impact is modest on a left-aligned column,
+  but the big numeral breathes by up to 64px across a day. Mono is not required
 
-**Done when:** ~~the new layout renders with live metro and weather, and I've
-picked the typeface from rendered options.~~ ✅ done.
+**Rejected here, later reversed:** this section used to list *"`LEAVE BY` with
+walk-time arithmetic"* as deliberately out of scope. It shipped on 2026-07-30 —
+see the leave-by section under EPIC 3. A live clock is still rejected.
 
 ---
 
@@ -701,7 +660,7 @@ check is the useful half — it covers the tools that need network or hardware.
 | `font_lab.py`, `font_specimen.py`, `label_lab.py`, `layout_lab.py` | ✅ typography/layout labs, all run |
 | `art_lab.py` | ✅ runs; docstring now marks AI generation as the **rejected** path |
 | `find_pi.py`, `first_light.py`, `ticktick_auth.py` | ✅ not runnable headlessly (network scan / hardware / interactive OAuth) |
-| `curate_art.py` | ⚠️ **dead** — see below |
+| `curate_art.py` | 🗑 **deleted** — see below |
 
 **`icon_sheet.py` had been broken since the four-band redesign** — it referenced
 `theme.STRIP_FACE`, `theme.STRIP_TOP` and `Weather(wind_bearing=…)`, none of which
@@ -717,13 +676,34 @@ It immediately earned its keep by exposing a real design question:
       umbrella should replace the glyph, sit beside it, or only override on
       non-obvious codes
 
-**`curate_art.py` is dead code.** It builds a hand-approved collection from **the
-Met**, which was rejected, and writes `assets/art_collection.json`, which nothing
-reads. Its job is now done better by `museum.py` (automatic) plus `art_veto.py`
-(veto), which is the workflow that was actually chosen.
-- [ ] **S** Delete it, or keep it purely as the record of the Met experiment. The
-      findings themselves are already preserved in `museum.py`'s docstring and in
-      EPIC 6 above, so nothing is lost by deleting
+### Dead-code sweep — 2026-07-30
+
+Removed, all provably unreferenced across the whole repo:
+
+- **`tools/curate_art.py`** — built a hand-approved collection from **the Met**,
+  which was rejected as a source, and wrote `assets/art_collection.json`, which
+  nothing read and which it had never actually produced. Superseded by `museum.py`
+  (automatic) plus `art_veto.py` (veto). Findings kept in `museum.py`'s docstring
+- **`art.py`: `procedural_scene()`** — defined, never called; took `_soften_edges()`
+  and `QUIET_ZONE` with it. `placeholder()` stays, it is live
+- **The plaque caption** — `_draw_caption_plaque()`, its dispatch, four `PLAQUE_*`
+  constants, two loaded fonts, and `CAPTION_STYLE` (a switch with one value)
+- **`theme.py`: `GREY_STEPS`, `DECISION_H`, `draw_tracked_centred()`** — dead
+- **`frame.py`** — an unused `Artwork` re-export; five leftover font constants in
+  `font_lab.py`
+- **A UTF-8 BOM in `art.py`**, the only one in the repo, left by a PowerShell
+  `Set-Content -Encoding utf8`. Python tolerated it; AST tooling did not
+
+Also retired the pre-redesign word **"strip"** from `icons.py`, `metro.py` and
+`weather.py` — the layout has been four bands for a while.
+
+Checked and deliberately *not* changed: there are **zero repeated 4+ line blocks**
+in the codebase, so no shared helpers were invented. The `sys.path` bootstrap in 11
+tools is 3 lines of standard idiom, and extracting it needs a module that itself
+requires the path to be set.
+
+Verified by rendering `frame.sample_data()` before and after: **identical digest
+`94f8cfc90d2c81d7`**, so nothing visible changed.
 
 ---
 
@@ -813,11 +793,11 @@ light is guessing dressed up as progress.
 
 **Refresh:**
 - Render every 5 min 07:00–22:00; **push only when the image changes**
-- ⚠️ **The daily art must be cached, not regenerated per render.** The guard
-  compares rendered pixels, so art that changes every render would break it
-  entirely. The procedural placeholder is seeded and therefore deterministic;
-  real generated art must be cached per day (already planned in Epic 6)
-- Whole-screen `GC16` every push; no partial-refresh path until after first light
+- ⚠️ **The daily art must be cached, not refetched per render.** The guard compares
+  rendered pixels, so art that changed between renders would break it entirely.
+  Done: `museum.daily()` writes `cache/art/` and reuses it all day
+- Whole-screen `GC16` every push. Partial refresh was considered and rejected —
+  see the DU note under EPIC 5
 - Daily clear at **06:59**; the 07:00 render bypasses the push guard
 - **The updated stamp must render the data's fetch time, not `now()`** — otherwise
   every render differs, the hash never matches, and the push guard does nothing

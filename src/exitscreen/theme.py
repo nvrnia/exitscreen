@@ -20,10 +20,9 @@ from PIL import ImageFont
 
 WIDTH, HEIGHT = 1200, 825
 
-# The IT8951 drives 16 grey levels. Snapping our palette to those exact values
-# means the preview cannot promise a tone the panel would quantise away.
-GREY_STEPS = [i * 17 for i in range(16)]  # 0, 17, 34 ... 255
-
+# The IT8951 drives 16 grey levels - multiples of 17. Every grey below is snapped
+# to one of them, so the preview cannot promise a tone the panel would quantise
+# away.
 PAPER = 255  # background
 BLACK = 0  # primary text, the big numerals
 MUTED = 102  # secondary text
@@ -76,7 +75,6 @@ ART_W = ART_RIGHT - ART_LEFT  # 1136
 
 DECISION_TOP = 530  # the rule sits on this line
 FOOTER_TOP = 759  # and on this one
-DECISION_H = FOOTER_TOP - DECISION_TOP  # 229
 
 FOOTER_BASE = 792  # baseline, optically centred in the footer band
 
@@ -126,24 +124,14 @@ TODO_STEP = 33
 # sitting at a fixed line, which left it stranded on a short list.
 TODO_OVERFLOW_BASE = ROW_TOP + 186  # 743
 
-# A task with a reachable leave-by deadline carries a second line under it.
-# The bare appointment time does NOT - it goes inline after the title, because a
-# whole row for a time TickTick already told you halved the visible list for no
-# gain. Only the computed deadline earns a row.
+# A leave-by deadline gets its own line under the task. The bare appointment time
+# does not - it goes inline after the title, since spending a whole row on a time
+# TickTick already gave us halved the visible list for nothing.
 #
-# The asymmetry is the mechanism. 22px inside a task-and-note pair against 36px
-# between pairs means proximity groups them, so the note reads as belonging to
-# the task above it. At an even 33px it would read as an unrelated extra task,
-# which is worse than not showing it at all.
-#
-# Cost, measured rather than assumed: a noted task occupies 58px against a plain
-# one's 33. One note and no overflow row leaves all four tasks visible; one note
-# with an overflow row leaves three. Two notes leave two. That degradation is the
-# right way round - a deadline matters more than a fourth checklist item.
-# 26, not 22: at 22 the audit measured only 6px of white between the task and its
-# note, which is negative leading for a 20px line under a 23px one - the note's
-# ascenders came up level with the line above. Both numbers moved together to keep
-# the inside gap comfortably smaller than the outside one.
+# The asymmetry is the mechanism: 26px inside a task-and-note pair against 38px
+# between pairs, so proximity groups the note with its task. At an even 33px it
+# read as an unrelated extra task. 22 was too tight - spacing_audit measured only
+# 6px of white, and the note's ascenders came up level with the line above.
 TODO_NOTE_OFFSET = 26  # task baseline -> its own note's baseline
 TODO_STEP_AFTER_NOTE = 38  # note baseline -> the next task's baseline
 
@@ -381,8 +369,3 @@ def draw_tracked_right(draw, right_x, baseline, text, font, tracking, fill=BLACK
     """Right-aligned letter-spaced text, for the footer's freshness stamp."""
     width = tracked_width(draw, text, font, tracking)
     draw_tracked(draw, (right_x - width, baseline), text, font, tracking, fill)
-
-
-def draw_tracked_centred(draw, centre_x, baseline, text, font, tracking, fill=BLACK):
-    width = tracked_width(draw, text, font, tracking)
-    draw_tracked(draw, (centre_x - width / 2, baseline), text, font, tracking, fill)

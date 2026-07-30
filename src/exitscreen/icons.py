@@ -1,4 +1,4 @@
-"""Icons for the info strip.
+"""Icons for the decision row.
 
 Weather comes from the bundled **Weather Icons** font (SIL OFL 1.1,
 erikflowers/weather-icons). Its glyphs live in the Private Use Area, so we map
@@ -52,7 +52,7 @@ _WMO = [
 def weather_name(code: int, umbrella_weather: bool = False) -> str:
     """Which icon a WMO code should use.
 
-    umbrella_weather wins outright: the strip answers "what do I take with
+    umbrella_weather wins outright: the panel answers "what do I take with
     me", so an upcoming soaking outranks a currently dry sky.
     """
     if umbrella_weather:
@@ -76,7 +76,7 @@ def draw_weather(d, x, y, size, code, umbrella_weather=False, fill=BLACK):
     )
 
 
-# --- strip furniture -----------------------------------------------------
+# --- hand-drawn marks ----------------------------------------------------
 
 
 def arrow(d, x, y, length=18, bearing=90, fill=MUTED, w=2):

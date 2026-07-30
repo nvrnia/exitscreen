@@ -8,7 +8,7 @@ Verified against the live API on 2026-07-26:
     local time and lines up with current.time.
   - hourly returns 7 days (168 entries); we only look a few hours ahead.
 
-The decisions are the point of this block. The strip answers "what do I take
+The decisions are the point of this block. The panel answers "what do I take
 with me", so an upcoming soaking matters more than a currently dry sky.
 """
 

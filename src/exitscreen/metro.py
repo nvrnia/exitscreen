@@ -142,7 +142,7 @@ def get_departures(limit: int = 2, force: bool = False) -> list[Departure]:
     """Upcoming departures, using the cache to stay polite and stay alive.
 
     Returns an empty list only when there is no usable data at all, which the
-    strip renders as a dash rather than an error.
+    frame renders as a dash rather than an error.
     """
     fresh = None if force else cache.load(CACHE_KEY, max_age=MIN_POLL)
     if fresh is not None:

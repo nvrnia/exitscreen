@@ -20,7 +20,7 @@ from PIL import Image, ImageDraw
 from . import art as art_module
 from . import icons
 from . import theme as T
-from .models import Artwork, Departure, FrameData, Task, Weather  # noqa: F401
+from .models import Departure, FrameData, Task, Weather
 
 MISSING = "–"  # en dash, shown when a feed is down
 
