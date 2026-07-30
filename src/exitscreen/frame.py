@@ -98,37 +98,6 @@ def _draw_caption_topbar(d, f, data):
                          T.CAPTION_TRACKING, T.MUTED)
 
 
-def _draw_caption_plaque(d, f, data):
-    """A small white label in the artwork's bottom-left, like a wall label.
-
-    Needs a solid background: over a busy sky, grey text on the image itself
-    would be unreadable.
-    """
-    if not data.artwork:
-        return
-    a = data.artwork
-    title = a.title if a.title != "?" else ""
-    meta = " · ".join(p for p in (a.artist, a.date) if p and p != "?")
-
-    max_text = 420
-    title = _fit(d, title, f.plaque_title, max_text)
-    meta = _fit(d, meta, f.plaque_meta, max_text)
-
-    tw = d.textlength(title, font=f.plaque_title)
-    mw = d.textlength(meta, font=f.plaque_meta)
-    width = max(tw, mw) + T.PLAQUE_PAD * 2
-    height = T.PLAQUE_PAD * 2 + 40
-
-    x0 = T.ART_LEFT + T.PLAQUE_INSET
-    y1 = T.ART_BOTTOM - T.PLAQUE_INSET
-    y0 = y1 - height
-    d.rectangle([x0, y0, x0 + width, y1], fill=T.PAPER, outline=T.DIVIDER, width=1)
-
-    _text(d, x0 + T.PLAQUE_PAD, y0 + T.PLAQUE_PAD + 15, title, f.plaque_title)
-    _text(d, x0 + T.PLAQUE_PAD, y0 + T.PLAQUE_PAD + 36, meta, f.plaque_meta,
-          T.MUTED)
-
-
 def _draw_metro(d, f, data):
     x, right = T.column(0)
 
@@ -375,10 +344,7 @@ def build_frame(
     )
 
     _draw_topbar(d, f, data)
-    if T.CAPTION_STYLE == "topbar":
-        _draw_caption_topbar(d, f, data)
-    elif T.CAPTION_STYLE == "plaque":
-        _draw_caption_plaque(d, f, data)
+    _draw_caption_topbar(d, f, data)
 
     # rules above the decision row and above the footer
     for y in (T.DECISION_TOP, T.FOOTER_TOP):

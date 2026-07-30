@@ -156,20 +156,15 @@ TODO_TIME_SEP = "   "
 TODO_NOTE_SIZE = 20
 
 # --- artwork caption -----------------------------------------------------
-# Two treatments, to be compared and one deleted:
-#   "topbar"  right-aligned in the top bar, which is otherwise half empty.
-#             Costs no space and never covers the art.
-#   "plaque"  a small white label inside the art's bottom-left corner, like a
-#             museum wall label. Sits with the work, covers a corner of it.
-CAPTION_STYLE = "topbar"
-
+# Artist and title, right-aligned in the top bar's otherwise empty half. Costs no
+# space and never covers the art.
+#
+# The rejected alternative was a "plaque": a small white wall-label inside the
+# art's bottom-left corner. It was rendered and compared, and it lost because it
+# covers a corner of the painting and needs an opaque background to stay legible
+# over a busy sky. Its code is gone; it is in git history if it is ever wanted.
 CAPTION_SIZE = 17
 CAPTION_TRACKING = 1.2
-
-PLAQUE_TITLE_SIZE = 17
-PLAQUE_META_SIZE = 14
-PLAQUE_PAD = 11
-PLAQUE_INSET = 16  # from the art box's left and bottom edges
 
 # Landscapes usually carry their horizon above centre, so the crop is biased
 # upward rather than taking the middle band.
@@ -355,10 +350,8 @@ class Fonts:
         self.todo_note = load(s, TODO_NOTE_SIZE, weight=400)  # leave by 18:25
         self.stamp = load(s, 19, weight=400)  # updated 14:27
 
-        # artwork caption - both treatments, only one is drawn
+        # artwork caption, in the top bar
         self.caption = load(s, CAPTION_SIZE, weight=400)
-        self.plaque_title = load(m, PLAQUE_TITLE_SIZE, weight=500)
-        self.plaque_meta = load(s, PLAQUE_META_SIZE, weight=400)
 
 
 # --- text helpers --------------------------------------------------------
