@@ -1,0 +1,187 @@
+"""Fetch, render, and push to the panel. The production entry point.
+
+    python run.py                 fetch, render, push only if changed
+    python run.py --force         push even if the image is identical
+    python run.py --clear         white the panel first, then render and push
+    python run.py --dry-run       fetch and render, write a PNG, touch no hardware
+    python run.py --wait-for-clock  block until NTP has set the time
+
+Run from cron every 5 minutes. The guard means the panel only refreshes when the
+image actually differs, so a 5-minute cadence costs nothing on the days when
+nothing changes - see BACKLOG.md for the endurance figures behind that.
+
+Every data source is wrapped: one dead feed costs its column, never the screen.
+"""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+import sys
+import time
+from datetime import date, datetime, timedelta
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT / "src"))
+
+from exitscreen import cache, eink, frame  # noqa: E402
+from exitscreen.models import FrameData  # noqa: E402
+
+DIGEST_KEY = "last_pushed_digest"
+OUT = ROOT / "out"
+
+REDUCTION = "grey16"
+
+
+def log(message: str) -> None:
+    print(f"{datetime.now():%Y-%m-%d %H:%M:%S}  {message}", flush=True)
+
+
+def wait_for_clock(timeout: int = 180) -> bool:
+    """Block until the system clock has been set by NTP.
+
+    This Pi has no RTC, so at boot it believes it is some time in the past. A
+    frame rendered then would show wrong departure times and, worse, would filter
+    out every departure as 'already gone'. Only matters for the @reboot run.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            out = subprocess.run(
+                ["timedatectl", "show", "-p", "NTPSynchronized", "--value"],
+                capture_output=True, text=True, timeout=10,
+            ).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            return True  # no timedatectl - not a systemd box, do not block forever
+        if out == "yes":
+            return True
+        time.sleep(5)
+    return False
+
+
+def freshest_fetch() -> datetime:
+    """When the newest feed data actually arrived - NOT when we rendered.
+
+    This is load-bearing. The footer draws this as "updated HH:MM", so if it came
+    from now() the stamp would advance every run, the digest would always differ,
+    and the push guard would refresh the panel every five minutes forever. Using
+    the cache ages means the stamp only moves when data genuinely does, which for
+    metro is every 10 minutes - and when metro refetches, the times on screen have
+    usually changed anyway.
+    """
+    ages = [age for age in (cache.age(key) for key in ("metro", "weather", "todo"))
+            if age is not None]
+    if not ages:
+        return datetime.now()
+    return datetime.now() - timedelta(seconds=min(ages))
+
+
+def gather() -> FrameData:
+    """Collect every block, tolerating individual failures."""
+    data = FrameData(day=date.today())
+
+    try:
+        from exitscreen import metro
+
+        data.departures = metro.get_departures(limit=2)
+        log(f"metro   : {len(data.departures)} departures")
+    except Exception as exc:  # noqa: BLE001 - a dead feed must not stop the frame
+        log(f"metro   : FAILED ({exc.__class__.__name__}: {exc})")
+
+    try:
+        from exitscreen import weather
+
+        data.weather = weather.get_weather()
+        w = data.weather
+        log(f"weather : {round(w.temp_c)}C wmo {w.wmo}" if w else "weather : no data")
+    except Exception as exc:  # noqa: BLE001
+        log(f"weather : FAILED ({exc.__class__.__name__}: {exc})")
+
+    try:
+        from exitscreen import todo
+
+        data.todos, data.todo_total = todo.get_todos(limit=4)
+        timed = [f"{t.title} ({t.note})" for t in data.todos if t.note]
+        log(f"todo    : {len(data.todos)} of {data.todo_total}"
+            + (f" | {', '.join(timed)}" if timed else ""))
+    except Exception as exc:  # noqa: BLE001
+        log(f"todo    : FAILED ({exc.__class__.__name__}: {exc})")
+
+    # Set last: the caches have now been written, so this reflects this run's
+    # data rather than the previous one's.
+    data.fetched_at = freshest_fetch()
+    return data
+
+
+def gather_art():
+    """(image, Artwork|None). Never raises - art.daily() has its own fallbacks."""
+    from exitscreen import art, theme
+
+    try:
+        image, artwork = art.daily(theme.ART_W, theme.ART_H)
+        log(f"art     : {artwork.label[:52]}" if artwork else "art     : placeholder")
+        return image, artwork
+    except Exception as exc:  # noqa: BLE001
+        log(f"art     : FAILED ({exc.__class__.__name__}: {exc})")
+        return None, None
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--force", action="store_true",
+                    help="push even when the image has not changed")
+    ap.add_argument("--clear", action="store_true",
+                    help="white the panel first; implies --force")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="render to out/ and touch no hardware")
+    ap.add_argument("--wait-for-clock", action="store_true",
+                    help="block until NTP has set the time (for @reboot)")
+    args = ap.parse_args()
+
+    if args.wait_for_clock:
+        log("waiting for NTP ...")
+        log("clock synced" if wait_for_clock() else "clock NOT synced - continuing")
+
+    data = gather()
+    art_image, data.artwork = gather_art()
+    img = eink.reduce(frame.build_frame(data, art=art_image), REDUCTION)
+    digest = eink.frame_digest(img)
+
+    if args.dry_run:
+        OUT.mkdir(parents=True, exist_ok=True)
+        path = OUT / "frame_grey16.png"
+        img.save(path)
+        log(f"dry run : {digest} -> {path}")
+        return 0
+
+    # A clear leaves the panel white, so the frame must be redrawn even if it is
+    # identical to what was there before - otherwise the guard would skip it and
+    # leave the display blank.
+    force = args.force or args.clear
+    previous = cache.load(DIGEST_KEY)
+
+    if digest == previous and not force:
+        log(f"no change ({digest}) - panel left alone")
+        return 0
+
+    try:
+        from exitscreen.display import Panel
+
+        panel = Panel()
+    except Exception as exc:  # noqa: BLE001
+        log(f"PANEL INIT FAILED ({exc.__class__.__name__}: {exc})")
+        return 1
+
+    if args.clear:
+        log(f"cleared in {panel.clear():.1f}s")
+
+    elapsed = panel.show(img)
+    cache.save(DIGEST_KEY, digest)
+    log(f"pushed {digest} in {elapsed:.1f}s"
+        + ("" if previous is None else f" (was {previous})"))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

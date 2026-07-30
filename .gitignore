@@ -1,0 +1,21 @@
+# generated frames and cached art
+out/
+
+# cached API responses - always safe to delete
+cache/
+
+# secrets - never commit (TickTick client secret, OAuth tokens, API keys)
+secrets.py
+.env
+token.json
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+
+# editors / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

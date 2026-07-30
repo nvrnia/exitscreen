@@ -1,0 +1,767 @@
+# exitscreen — backlog
+
+Working plan. `exitscreen-spec.md` says *what* we're building and why;
+this file tracks *what's left and in what order*.
+
+**Keep this updated as we go** — tick items off, move things between sprints,
+add anything discovered mid-build. It's the memory between sessions.
+
+Legend: `[ ]` todo · `[~]` in progress · `[x]` done · ⚠️ needs live verification
+Size: **S** ≈ one sitting · **M** ≈ a session · **L** ≈ multiple sessions
+
+---
+
+## Where we are now
+
+*Last updated: 2026-07-27 — redesign built. Everything laptop-side is done.*
+
+> ✅ **It is on the wall and running.** First light achieved 2026-07-27; the Pi
+> renders every 5 minutes from cron and pushes only when the image changes.
+> Remaining work is the daily art (Epic 6) and living with it.
+
+| column | state |
+|---|---|
+| METRO | ✅ live — real the home stop departures |
+| WEATHER | ✅ live — real the city conditions + umbrella rule |
+| TODO | ✅ live — real tasks from the "our to do" list |
+| ART | ⏸ procedural placeholder — real art parked by design |
+| PANEL | ✅ live — Pi 3A+ at <pi ip>, cron every 5 min |
+
+See it:
+
+```
+cd "C:\Users\jmand\Downloads\exitscreen"
+py tools/preview.py --live        # fetches real data, opens the viewer
+py tools/preview.py               # sample data, no network
+py tools/preview.py --no-show     # just write PNGs to out/
+```
+
+Viewer keys: `1`/`2`/`3` reduction mode · `R` re-render · `S` save · `Q` quit.
+⚠️ The Tk viewer has never actually been run — only headless rendering has
+been verified. If it errors, the PNGs in `out/` still work.
+
+**The biggest untested assumption is still the panel.** Everything has been
+judged on a backlit monitor; e-ink is neither backlit nor high-contrast.
+
+---
+
+## Fiddling with the icons — quick reference
+
+Everything icon-related lives in **`src/exitscreen/icons.py`**, and that file is
+**unaffected by the redesign** — the codepoints and WMO mapping carry over intact.
+Only the *placement* numbers quoted below move, since the weather column is being
+rebuilt.
+
+- **`GLYPHS`** — maps names to codepoints in the Weather Icons font.
+  584 glyphs are available; we use 9. To browse the rest, look at
+  `css/weather-icons.css` in the erikflowers/weather-icons repo — each
+  `.wi-NAME:before { content: "\fXXX" }` is a usable codepoint.
+- **`_WMO`** — which WMO codes map to which icon name. Reorder or resplit freely.
+- **`weather_name()`** — the umbrella override lives here (umbrella wins over
+  the actual sky, deliberately).
+- **`draw_weather()`** — size and positioning. Note glyphs draw *wider* than
+  their nominal box, so changing the size may need the temperature offset in
+  `frame.py` (`x + 86`) adjusted to match.
+- **Size / placement of the whole column** is in `frame.py` → `_draw_weather()`.
+
+Tools:
+
+```
+py tools/icon_sheet.py            all 9 states at once -> out/icon_sheet.png
+py tools/icon_sheet.py --browse   all 256 glyphs + codepoints -> out/icon_catalogue.png
+py tools/preview.py --live        the full frame; press R to re-render
+py tools/font_specimen.py         all 23 bundled faces, side by side
+py tools/font_lab.py --live       typography candidates in the real layout
+py tools/font_lab.py --live literata+archivo newsreader   any loose names work
+```
+
+`font_specimen.py` **discovers** fonts from `assets/fonts`, so anything dropped
+in that folder appears on the next run. `font_lab.py` takes loose names and
+`main+sub` pairings.
+
+`icon_sheet.py` drives the real `build_frame()` path, so it shows what the
+panel would actually do rather than an approximation. `--browse` is how you
+find a different glyph: read the codepoint off the sheet, paste it into
+`GLYPHS`. The font has far more than weather — moon phases, thermometers,
+sunrise/sunset, a Beaufort wind scale (`f0b7`–`f0c2`).
+
+Minor: a few cells in the catalogue render as empty boxes — those are unused
+slots in the font, not bugs.
+
+---
+
+## EPIC 0 — Foundations ✅ done
+
+- [x] Project skeleton, `src/` layout, `.gitignore`, requirements
+- [x] Fonts bundled with OFL licenses; variable-weight support verified
+- [x] `theme.py` — geometry, greys, font roles (the single tuning surface)
+- [x] `icons.py` — WMO code mapping; weather from a bundled icon font,
+      arrow + checkbox hand-drawn
+- [x] `art.py` — procedural placeholder scene
+- [x] `frame.py` — `build_frame(data) → image`, pure, no platform imports
+- [x] `eink.py` — 256→16 grey reduction, plus 1-bit modes for comparison
+- [x] `tools/preview.py` — headless render + Tk viewer
+- [x] Decided grey16 over 1-bit dithering (dithering shredded hairlines and muted text)
+
+**Left over from this epic:**
+- [ ] **S** Confirm the Tk viewer actually opens — only ever run headless
+
+~~Decide caption case~~ and ~~lock the EB Garamond + Inter pairing~~ — **both
+superseded by Epic 2.5.** The redesign deletes the letterspaced caption, which was
+the only reason a serif was in the project at all. Typography is reopened and gets
+chosen from rendered candidates in `font_lab.py`.
+
+---
+
+## EPIC 1 — Metro (OVapi) 🔶 mostly done
+
+- [x] ⚠️ Found the working code: **`<stop code>`**, and it is a **TimingPointCode**,
+      not a StopAreaCode (`stopareacode/` returns an empty object for it)
+- [x] ⚠️ Dumped a live response; all spec field names confirmed
+- [x] Decided single TPC. It turned out `<stop code>` **is already our direction**
+      (northbound: D→the interchange, E→the far terminus), so no direction
+      filter is needed at all. `<stop code>-OPPOSITE` is the opposite platform
+- [x] `metro.py` — fetch, filter, sort, next N as `Departure` objects
+- [x] Minutes from `ExpectedDepartureTime`; real-time delays confirmed present
+- [x] Disk cache + 10-minute minimum poll interval, enforced in the module
+- [x] Falls back to cached data on failure, then to `–`
+- [x] Live departures rendering on a real frame
+
+**Discovered along the way — recorded in the spec:**
+- `v0.ovapi.nl` has a **broken TLS certificate** (hostname mismatch). Use `http://`.
+  Never "fix" this by disabling certificate verification
+- Timestamps are **naive local Amsterdam time**; parsed as `Europe/Amsterdam`
+  explicitly rather than trusting the Pi's clock
+- The feed **includes trains that have already departed** — filtered out
+- Windows has no system tz database → added `tzdata` to requirements
+- ⚠️ **The feed reaches much further than assumed: 17 departures, ~85 minutes
+  ahead** (measured 2026-07-30). An earlier note here said ~20 minutes and that
+  was wrong. It matters because it makes "leave by 18:22 → catch the D at 18:27"
+  genuinely buildable for anything inside the next hour and a half
+
+**Walk-time filter — added 2026-07-30.**
+
+The column answered "which metro is next", not "which metro can I catch". At
+10:50 the 70px hero clock showed `10:52` — a train that is a 3–5 minute walk
+away, so unreachable — while the one you could actually make was demoted to the
+small grey line beneath it. The panel's largest element was wrong and the right
+answer was in the small print.
+
+- [x] `WALK_TO_PLATFORM_MIN = 6` in `metro.py` — front door to standing on the
+      platform, walk plus stairs. Departures closer than this are dropped
+      entirely; `parse()` takes a `walk_min` override so the boundary is testable
+- [x] Verified by sweeping the cutoff against the live feed: the window slides
+      correctly and still finds departures at a 45-minute cutoff
+- [x] Chosen to filter **silently** — no "leave now" cue, no "+6 min walk"
+      caption. The value is in the times being trustworthy, not in self-explanation
+- [ ] **S** Tune the 6 after a week of real use. Time the walk properly, door to
+      platform, and set the real number — it is one constant
+- Known and intended: the hero **jumps a whole interval** as the threshold is
+  crossed. At 10:46 it reads 10:52; a minute later that train is out of reach and
+  it reads 10:57
+
+**Still open:**
+- [ ] **S** ⚠️ Check what the feed does late at night / during engineering works
+      (does `Passes` go empty?) — the no-departures path is written but untested
+- [ ] **S** Consider shortening `the interchange` → `Centraal` for the strip
+- [ ] **S** Verify the numbers against the actual platform sign in person
+
+~~Decide how to render an imminent train (`0'` vs `now`)~~ — **moot.** The
+redesign switches to absolute times, which never go stale.
+
+**Done when:** the strip shows real the home stop departures I can verify
+against the platform sign.
+
+---
+
+## EPIC 2 — Weather (Open-Meteo) ✅ built
+
+- [x] `weather.py` — current temp / WMO code / wind speed + direction
+- [x] ⚠️ Units confirmed already metric (`°C`, `km/h`, `°`) — no need to force them
+- [x] Umbrella rule: raining now (WMO ≥ 51) **or** ≥40% precipitation
+      probability within the next 6 hours
+- [x] Wind direction feeds the bearing-aware arrow
+- [x] Cache + 15 min minimum poll + falls back to stale, then to `–`
+- [x] Live weather rendering on a real frame
+
+**Notes:**
+- `timezone=auto` resolves to `Europe/Amsterdam`; the hourly grid aligns with
+  `current.time`, so the lookahead window indexes cleanly
+- `wind_direction_10m` is the direction wind comes **from** (meteorological
+  convention). The arrow is flipped 180° to point where it's blowing **to**
+- HTTPS works properly here, unlike OVapi
+
+**Icons — replaced with a bundled font:**
+- [x] Swapped the hand-drawn weather vectors for the **Weather Icons** font
+      (SIL OFL 1.1, verified; attribution in `assets/fonts/OFL-weathericons.txt`)
+- [x] Codepoints parsed from the project's own CSS, not guessed — listed in `icons.py`
+- [x] All nine states rendered through the real frame code and eyeballed
+- [x] Spacing fixed: several glyphs draw wider than their nominal box
+- Wind arrow and checkbox stay hand-drawn — the arrow must rotate to an
+  arbitrary bearing, which a fixed glyph cannot do
+
+**Still open:**
+- [ ] **S** Tune `UMBRELLA_THRESHOLD` (40%) and `LOOKAHEAD_HOURS` (6) after
+      living with it — these are guesses, not measurements
+- [ ] **S** ⚠️ Check how the icons hold up on real e-ink; they are heavier and
+      more solid than the delicate cross-hatch art above them
+
+**Done when:** I look at the screen, see the umbrella, take an umbrella, and it rains.
+
+---
+
+## EPIC 2.5 — Dashboard layout redesign 🔶 approved, not built
+
+Replaces the hero-art layout. Full plan and reasoning is in the approved plan
+file; this is the checklist.
+
+**Why:** `4'` starts lying the moment it's drawn — the panel refreshes every few
+minutes, so "in 4 minutes" can be long gone. `08:14` stays correct. That's a
+correctness fix, and it's what makes push-on-change possible.
+
+```
+┌─────────────────────────────────────────────────┐
+│ SUN 26 JULY                                     │  ~46px
+├─────────────────────────────────────────────────┤
+│              ART (full bleed)                   │  ~371px  45%
+├─────────────────────────────────────────────────┤
+│ METRO        │ 20° → 23°   ☂ │ TODAY            │
+│ 08:14        │ ▁▁▃█▅▂        │ — Pick up parcel │  ~358px
+│ then 08:21   │ Rain 15:00    │ — Buy bread      │
+│ D → R'dam C. │ wind 6        │ +2 more          │
+├─────────────────────────────────────────────────┤
+│ OUR EXIT SCREEN                  updated 08:04  │  ~50px
+└─────────────────────────────────────────────────┘
+```
+
+- [x] ⚠️ **Beaufort table verified.** Memory was correct. km/h upper bounds:
+      `0:<1 · 1:5 · 2:11 · 3:19 · 4:28 · 5:38 · 6:49 · 7:61 · 8:74 · 9:88 ·
+      10:102 · 11:117 · 12:≥118`. Sources differ by ±1 at the 117/118 boundary;
+      irrelevant at the city wind speeds.
+      **Bonus:** Force 6 is officially described as *"umbrellas are hard to use"* —
+      a ready-made threshold for switching the umbrella advice to "take a coat"
+- [x] ⚠️ **Tabular figures confirmed unavailable.** `features=['tnum']` raises
+      `KeyError: ... not supported without libraqm`. Trap found:
+      `layout_engine=RAQM` is silently *accepted* and falls back to basic layout
+      with only a warning — so it looks like it worked
+- [x] **Digit widths measured instead** — and this changes the font shortlist:
+      **Inter (our current pick) has proportional digits** (`1`=24px vs `0`=40px
+      at 60pt), while **IBM Plex Sans is tabular by default** (0px jitter) and is
+      already bundled. Practical impact is modest since the column is
+      left-aligned — consecutive times differ ~4px — but across the day the big
+      numeral visibly breathes by up to 64px. **Mono is not required to fix this**
+- [x] `theme.py` — four-band geometry inside a hairline plate frame
+- [x] `frame.py` — split into `_draw_topbar` / art / `_draw_decision_row` /
+      `_draw_footer`. `_fit()` and per-column degradation kept
+- [x] `models.py` — `Departure.when`, `FrameData.fetched_at`, new `Weather` fields
+- [x] `metro.py` — absolute `HH:MM`. No new selection logic needed
+- [x] `weather.py` — `beaufort()`, rain series, `first_rain_at()`, gusts added to
+      the existing single call
+- [x] Adaptive weather: rain today (≥25%) → bars + small icon; otherwise enlarged
+      icon alone. Both states mocked up and approved before building
+- [x] Conditional wind: hidden when calm; Beaufort + gusts when notable
+- [x] `eink.py` — `frame_digest(img)`, verified against 5 cases
+- [x] `tools/font_lab.py` + `tools/font_specimen.py` — 23 faces compared
+
+**Typography — decided by looking, not by adjectives:**
+- **Literata** (main) + **Bricolage Grotesque** (supporting). Literata was
+  commissioned for e-reader screens, which is an unusually good fit for e-ink,
+  and gives the printed-plate feel the art bible asks for
+- The rule: **serif is the panel's furniture, sans is the data hung on it.**
+  Serif → date, `METRO`, `TODAY`, clock, temperature, nameplate.
+  Sans → second departure, destination, task text, rain line, `+N more`, stamp
+- All-serif was tried first and rejected as too heavy
+- Rejected: every interface sans (Inter, Plex, DM, Instrument, Archivo, Atkinson)
+  as too corporate/generic — a fair criticism of a shortlist I had picked purely
+  on metrics rather than on the brief
+- Atkinson had a **missing `→` glyph** rendering as tofu, which is why the arrow
+  is now drawn as a vector. Typeface choice is no longer limited by glyph coverage
+- Both `→` arrows and the todo em-dash gap are now **measured, not hardcoded** —
+  a fixed offset jams text against the dash on wider faces
+
+**Rejected on purpose:**
+- `LEAVE BY` with walk-time arithmetic — just the metro times
+- A live clock — see the refresh decisions below
+- All-serif typography — too much
+
+**Done when:** ~~the new layout renders with live metro and weather, and I've
+picked the typeface from rendered options.~~ ✅ done.
+
+---
+
+## EPIC 3 — Todo (TickTick) ✅ built
+
+- [x] App registered at developer.ticktick.com/manage
+- [x] Secrets in `.env` (gitignored); `.env.example` committed as the record of
+      which values are needed
+- [x] `config.py` — stdlib-only `.env` reader/writer, real env vars take precedence
+      (matters on the Pi, where cron or systemd may supply values directly)
+- [x] `tools/ticktick_auth.py` — two-step OAuth2, `tasks:read` only
+- [x] Access token written to `.env`
+- [x] Project id saved: **"our to do"** `<project id>`
+- [x] ⚠️ Live task JSON dumped and field names confirmed
+- [x] `todo.py` — fetch, sort, titles + total for the "+N more" line
+- [x] Falls back to a stale list on failure, then to "nothing to do"
+- [x] All three columns now rendering real data
+
+**Verified live — recorded so it is not rediscovered:**
+- **Completed tasks are absent from the response entirely.** Ticking one off in
+  the app removes it from the payload, so there is no completion filter to get
+  backwards. The `status == 0` check is defensive only
+- **`sortOrder` is negative and the API does not sort by it.** Tasks came back in
+  the wrong order; without an explicit ascending sort the list looks shuffled
+- The token lasts **~180 days** and **no refresh_token is issued** — re-running
+  `tools/ticktick_auth.py` is the recovery path
+- Credentials go to the token endpoint as **form fields** (the HTTP Basic
+  fallback was not needed)
+- The redirect URI **must be registered on the app first**, or authorising fails
+  with `At least one redirect_uri must be registered with the client`
+- Endpoint shape: `GET /open/v1/project/{id}/data` → `{project, tasks, columns}`
+- **`tags` is absent entirely** on a task with no tags — it needs a default
+- ⚠️ **`dueDate`'s offset is honest UTC**, not local wall time wearing a `+0000`
+  badge (verified 2026-07-30). An all-day task due 27 July came back as
+  `2026-07-26T22:00:00.000+0000`, and 22:00 UTC *is* midnight Amsterdam on the
+  27th in summer — only true if the offset means what it says. A cosmetic offset
+  would have read `2026-07-27T00:00:00.000+0000`.
+  **The trap:** that value's naive date is 26 July, the wrong day. Always convert
+  to `Europe/Amsterdam` before reading a date or an hour off it. The separate
+  `timeZone` field is the user's own zone and is not needed
+
+### Leave-by times on timed tasks — built 2026-07-30
+
+The one feature on the panel that changes behaviour rather than just informing.
+A task with a clock time gets a second line: **"leave by 18:25"**.
+
+The enabling fact was that TickTick *already* sends `dueDate` / `isAllDay` /
+`tags` and `parse()` was throwing all of it away. No new API, no new habit — set
+a due time in the app as normal.
+
+- [x] `Task` model replaces bare title strings, with `at` (inline time) and
+      `note` (the second line) as finished display strings decided in `todo.py`,
+      so `frame.py` still needs no notion of "now"
+- [x] Journey time comes from a **`#40m` tag** meaning *front door to being
+      there*. Read from the title **and** from `tags`, since it is unverified
+      which one TickTick puts it in — accepting both costs one branch
+- [x] ⚠️ **The leading `#` is required.** Without it "Buy 2m of rope" claims a
+      two-minute journey, and a wrong leave time looks exactly as authoritative
+      as a right one. Tested
+- [x] The leave line **disappears once it has passed** — a stale "leave by 08:20"
+      at 11:00 is noise that teaches you to ignore the live ones
+- [x] Timed but untagged → **inline time only**, no second line
+- [x] Push guard verified: the digest changes **exactly once per timed task per
+      day**, at the deadline. Renders minutes apart are byte-identical otherwise
+
+**Two design corrections worth keeping, both found by rendering it:**
+1. A bare "19:00" on its own row halved the visible list for no gain — it is a
+   fact TickTick handed us, not a deadline we computed. Bare times went **inline**
+   after the title; only the computed leave-by earns a row
+2. `data.overflow` counted `todo_total - len(todos)` from what was *fetched*, but
+   the renderer can draw fewer, so "+N more" undercounted. Now counted from what
+   was actually **drawn**. Latent before; notes made it common
+
+**Geometry:** `TODO_NOTE_OFFSET = 22` inside a pair against
+`TODO_STEP_AFTER_NOTE = 36` between pairs. The asymmetry *is* the mechanism —
+proximity groups the note with its task; at an even 33px it read as an unrelated
+extra task. Measured cost: a noted task takes 58px against a plain 33. One note
+and no overflow row → all four tasks visible; one note with overflow → three;
+two notes → two. That degradation is the right way round.
+
+**Still open:**
+- [ ] **M** Once a leave time falls inside the feed's ~85-minute reach, name the
+      actual train: "leave 18:22 → D 18:27". Now clearly buildable — the 20-minute
+      horizon that argued against it was a mis-measurement
+- [ ] **S** Confirm by eye on a *timed* task, not just an all-day one. The
+      timezone reasoning is sound but only all-day tasks existed to test against
+- [ ] **S** Wording is unlocked: "leave by 18:25" vs "leave 18:25" vs "→ 18:25"
+- [ ] **S** Decide whether to merge our two separate lists too.
+      The API has no "all tasks" endpoint, so that means two calls and a merge
+- [ ] **S** Tune the display limit (currently 4) once real tasks accumulate
+- [ ] **S** Diarise the token expiry — roughly late January 2027
+
+**Done when:** ticking a task in the phone app clears it from the door within a
+poll cycle.
+
+---
+
+## EPIC 4 — First light on the panel ⬜ 🔴 biggest risk
+
+Everything so far is theory until pixels hit glass. **Can be pulled forward
+at any time** — it doesn't depend on the data blocks.
+
+- [x] Installed GregDMeyer/IT8951 on the Pi — **but NOT with the `[rpi]` extra**,
+      see the trixie notes below
+- [x] Deployed by `scp` of `src/ tools/ assets/ run.py .env` to `~/exitscreen`
+- [x] `display.py` — the only module that imports IT8951. VCOM **-1.81**
+- [ ] **L** ⚠️ Push a real frame and judge it in person:
+      - does grey16 hold up, or does 1-bit actually look better on glass?
+      - do the hairline rules survive?
+      - is the 78px metro number readable from a few steps back?
+      - is the caption tracking right at real size?
+- [ ] **S** Tune `theme.py` against what we see, not what the monitor showed
+- [ ] **S** Confirm landscape orientation / rotation is right
+- [ ] **S** Judge how intrusive the `GC16` black flash actually is in the hallway
+- [ ] **S** Test whether `DU` renders correctly on this controller — the mode
+      docs warn some reduced modes render a white background as grey
+
+**Post-first-light optimisation to evaluate (deliberately deferred):**
+Only the metro column changes often, so flashing the whole 1200×825 panel to
+update one corner is wasteful. Region-based partial `DU` refresh of just that
+column would cost 200–600ms with **no black flash**, needing a full `GC16` pass
+every 5–10 partials to clear accumulated ghosting (≈ hourly at our rate). Our
+metro text is pure black on white, which is exactly what `DU` is good at.
+
+Deferred because it rests on two things we cannot check without hardware: how bad
+the flash really is, and whether `DU` behaves on this controller. Adding it later
+touches only the push step, not the renderer.
+
+### First light — what actually happened, 2026-07-27
+
+Everything worked first try. Measured, not estimated:
+- panel reports exactly **1200 x 825** — no rotation needed
+- controller init **2.3s**, clear **0.7s**, `GC16` full draw **1.5s**
+  (I had estimated 1–3s for the draw; it is at the fast end)
+- from cron: fetch + render ~1s, push **0.7s**
+
+**Raspbian 13 (trixie) specifics — these bit, or nearly did:**
+- **PEP 668**: system-wide `pip install` is refused. Solution is a venv at
+  `~/venv` created with `--system-site-packages`, so it can see apt's prebuilt
+  Pillow / requests / GPIO rather than rebuilding them on a 512MB board
+- **Do NOT `pip install ./[rpi]`**, despite the driver's README saying so.
+  `python3-rpi-lgpio` is preinstalled and provides the `RPi.GPIO` module name as
+  a drop-in; the extra would fetch the legacy library from PyPI and shadow it.
+  Install plain `pip install --no-build-isolation ./IT8951`
+- `--no-build-isolation` makes the build use apt's Cython instead of downloading
+  and compiling one — armhf often has no prebuilt wheel
+- Debian calls Pillow **`python3-pil`**, not `python3-pillow`
+- SPI was already enabled (`/dev/spidev0.0` present) and the `exitscreen` user is
+  already in the `gpio` and `spi` groups, so **no sudo is needed** to drive the panel
+- Pi Pillow has **libraqm**, the Windows laptop does not. `theme.load()` now forces
+  `ImageFont.Layout.BASIC` on both, or the preview would stop predicting the panel
+
+**Done when:** ~~a frame with fake data is hanging by the door looking correct.~~
+✅ real data, on the wall.
+
+---
+
+## EPIC 5 — Make it live ⬜
+
+Turning a script into an appliance.
+
+- [x] `run.py` — fetch all blocks → build frame → push. Each block wrapped so one
+      failure costs its column, not the screen. Flags: `--force`, `--clear`,
+      `--dry-run`, `--wait-for-clock`
+- [x] On-disk cache layer shared by all data blocks — `cache.py` exists
+- [x] Scheduling — cron installed, recorded in `deploy/crontab`:
+      - render every **5 min, 07:00–22:00**; asleep overnight
+      - **push only when the rendered image differs** (content hash)
+      - daily white clear at **06:59**, one minute before the window opens
+      - the **07:00 render must bypass the push guard** — the panel has just been
+        cleared, so a hash matching last night would leave it blank all day
+      - art regen each morning
+- [ ] **S** ⚠️ No RTC on this Pi — don't trust the clock until NTP syncs after boot.
+      Wait for time sync before the first render
+- [x] Survives reboot — `@reboot` with `--wait-for-clock`, which polls
+      `timedatectl` until NTP sets the time. Without it the Pi boots believing it
+      is in the past, every departure looks "already gone" and gets filtered out,
+      and the metro column renders empty
+- [ ] **S** Log rotation — `~/exitscreen.log` grows unbounded at ~180 runs/day
+- [ ] **M** ⚠️ **Make the SD card survive a power cut.** See the incident below.
+      Move `~/exitscreen.log` and the `cache/` directory to a tmpfs RAM disk so
+      nothing is being written during normal operation. The log is diagnostic
+      only and losing it on reboot costs nothing
+
+### Incident 2026-07-28 — cold unplug killed the SD card
+
+Unplugged without shutting down, replugged hours later: red LED on, green LED
+never lit, nothing on the network. Reflashing the **same** card fixed it
+completely.
+
+**The misleading part**, recorded so the next diagnosis is faster: the card read
+*perfectly* from Windows — partition table intact, every boot file present and
+correct size, `config.txt` and `cmdline.txt` clean. On that basis I concluded the
+card was healthy and sent us looking at power supplies and jumper wiring. Wrong.
+
+**A readable card is not a bootable card.** Windows can only see the FAT32 boot
+partition; the ext4 root is invisible to it, and the Pi's bootloader is far less
+tolerant of FAT damage than Windows' driver is. "Green LED never lights" does
+*not* rule out the card.
+
+**Next time, reflash early.** It is free, it is both the test and the likely fix,
+and it takes twenty minutes with `deploy/setup_pi.sh`.
+
+Also fixed as a result: `setup_pi.sh` aborted silently at the cron step on a
+fresh machine, because `set -euo pipefail` treated "no crontab yet" as fatal.
+- [ ] **S** Survive WiFi dropping: last good data, never a broken screen
+- [ ] **S** Log somewhere I can read over SSH when it misbehaves
+
+### Refresh cadence — researched, settled, don't reopen
+
+**Panel wear is not a constraint.** Rated endurance: **1 million** updates
+(pessimistic, OED Technologies), **10 million** (E Ink Corporation for Pearl), or
+~**90 million** from Visionect's 50,000-hour figure. A real teardown found a
+screen still readable after 4.5 years and ~3–4M updates.
+
+At 5 min over a 15-hour day = **180/day ≈ 65,700/year**. Even on the pessimistic
+1M rating that's **~15 years** — and the push guard means actual pushes land far
+under that.
+
+The real costs are the **1–3 second black flash** per full refresh, and the fact
+that **nothing changes between OVapi polls** (10 min, to be polite to a free
+community server). With absolute times the frame is byte-identical between polls,
+so hashing and pushing only on change means the cadence costs nothing while a
+delayed train still shows up sooner than a fixed cycle allows.
+
+One useful side finding: "dark staining" in areas of **static** imagery is a real
+ageing mechanism. Because every push is a full refresh, every pixel is exercised
+every time — so the never-changing nameplate isn't at risk.
+
+Sources: [Visionect lifespan](https://www.visionect.com/blog/epaper-lifespan/) ·
+[e-ink degradation](https://e-ink-reader.ru/eink_degradation_en.php) ·
+[refresh modes](https://www.geniatech.com/solution/e-paper-refresh-technology/)
+
+- [ ] **S** ⚠️ Still worth checking the ED097TC2 datasheet for its own rated
+      update count, rather than relying on figures for comparable panels
+
+**Done when:** it's been up a week without me touching it.
+
+---
+
+## EPIC 6 — Daily art ✅ built (museum, not AI)
+
+**The plan changed course.** This epic was written around AI generation; the
+artwork now comes from the **Cleveland Museum of Art's** open collection. Real
+paintings won on the grounds that they are prettier and more honest — an oil
+actually has the tone and brushwork a prompt only asks for.
+
+- [x] `museum.py` — Cleveland client, filtered index cached weekly
+- [x] Deterministic selection: fixed-seed shuffle indexed by day ordinal, so a
+      full cycle passes before any repeat **with no "seen" state file** to lose or
+      corrupt. ~120 works ≈ 4 months
+- [x] Greyscale before resize (a 424MB Pi should not hold a full-colour painting
+      and its copy), crop to fill at `ART_CROP_CENTRING = (0.5, 0.45)` because
+      landscapes carry their horizon above centre
+- [x] Today's image cached to `cache/art/` — **load-bearing, not an optimisation.**
+      The push guard compares pixels, so art that changed between renders would
+      flash the panel every five minutes
+- [x] Fallback chain: today's → yesterday's cached → `art.placeholder()`
+- [x] Caption: artist · title, right-aligned in the otherwise-empty top bar
+- [x] `tools/art_veto.py` — blacklist in `assets/` so a veto survives a reflash,
+      plus `--next N`, a contact sheet of upcoming picks
+
+**Three sources tested. Recorded so none gets retried:**
+- **Cleveland** ✅ — open API, no key, and *real filters* rather than free text:
+  `type=Painting&cc0=1&has_image=1`. The response carries image dimensions, so
+  works that would not survive the crop are ranked out before anything downloads
+- **The Met** ❌ — images fine and keyless, but the search is unusable.
+  "landscape etching" returned a desk, a photograph and a calavera print; its own
+  Drawings and Prints department reported one landscape. **340 candidates yielded
+  3 usable works**
+- **Art Institute of Chicago** ❌ — excellent search, but the IIIF image endpoint
+  returns **403** even with their documented identifying header
+- **AI (Pollinations)** — worked on its own terms: no key, native 1136×450, seeded
+  and therefore reproducible. Kept in `tools/art_lab.py` as a documented fallback,
+  not the live path
+
+**Contrast — the one open thread.** The first painting on real glass was rejected
+as too flat. Paintings often use only the middle of the tonal range, so quantising
+to 16 greys wastes most of the levels.
+- [x] Conditional stretch: only works measuring below `ART_FLAT_THRESHOLD = 45`
+      (std dev of greys) get touched. A blanket stretch would vandalise paintings
+      that are dark or pale *on purpose* — Church's "Twilight in the Wilderness"
+      would become afternoon
+- [ ] **M** ⚠️ **Untried and probably the real fix: dither the art region** to the
+      same 16 levels instead of posterising. Banding is a quantisation artefact,
+      so contrast tuning treats the symptom. Text and rules must stay hard-edged,
+      so this is the art box only
+- [ ] **S** The 45 threshold is calibrated on very few points. Revisit as vetoes
+      accumulate — the `--next` sheet prints each work's score
+
+---
+
+## API review — both choices re-verified 2026-07-26
+
+Checked rather than inherited from the spec.
+
+**Metro — OVapi stays.** Confirmed as the standard source for Dutch realtime
+departures across all operators including the operator. The alternatives are worse here:
+NDOV Loket is the raw upstream feed and needs materially more work; the NS API is
+trains only, no metro. The known warts (plain HTTP because of the broken
+certificate, community server, poll gently) are the cost of the category.
+
+**Weather — Open-Meteo stays as primary.** One keyless request returns
+temperature, wind, gusts *and* a full-day hourly outlook. It already blends KNMI,
+so we get Dutch met office data without KNMI's own registration and rawer feed.
+Met.no is comparable but no better for this.
+
+### Optional follow-on: Buienradar rain nowcast ⬜
+
+Free, keyless, **2-hour rain forecast at 5-minute resolution** off Dutch rain
+radar — granularity Open-Meteo can't match. For a screen read *in the act of
+leaving*, "rain starting in 20 minutes" might be the most valuable line on it.
+
+- [ ] ⚠️ **S** Verify the current hostname before writing any parser
+      (`gadgets.` vs `gpsgadget.buienradar.nl`) — same discipline as the metro code
+- [ ] **S** Record the attribution: terms are **non-commercial use with
+      attribution required**. Fine for a hallway, but it must be credited
+- Cannot replace the hourly outlook: 2 hours ahead won't tell you about 15:00
+  at breakfast. This is an addition, not a substitution
+
+Sources: [Buienradar raintext](https://github.com/thijse/Buienradar/blob/master/README.md) ·
+[OVapi / NDOV](https://publicapi.dev/transport-for-the-netherlands-api)
+
+---
+
+## Tools — full sweep 2026-07-30
+
+Every script in `tools/` was checked against the current package API, statically
+(a script walked each file's AST and verified every `theme.X` / model field it
+references actually exists) and then by running it. **All 13 pass.** The static
+check is the useful half — it covers the tools that need network or hardware.
+
+| Tool | State |
+|---|---|
+| `preview.py` | ✅ the main one. `--live` now prints each task's leave-by note |
+| `spacing_audit.py` | ✅ measures ink bands and flags tight gaps. Caught the to-do note at 6px |
+| `icon_sheet.py` | ✅ **repaired** — see below |
+| `art_veto.py` | ✅ **extended** with `--next N`, a contact sheet of upcoming picks |
+| `font_lab.py`, `font_specimen.py`, `label_lab.py`, `layout_lab.py` | ✅ typography/layout labs, all run |
+| `art_lab.py` | ✅ runs; docstring now marks AI generation as the **rejected** path |
+| `find_pi.py`, `first_light.py`, `ticktick_auth.py` | ✅ not runnable headlessly (network scan / hardware / interactive OAuth) |
+| `curate_art.py` | ⚠️ **dead** — see below |
+
+**`icon_sheet.py` had been broken since the four-band redesign** — it referenced
+`theme.STRIP_FACE`, `theme.STRIP_TOP` and `Weather(wind_bearing=…)`, none of which
+survived. Repaired to crop `DECISION_TOP..FOOTER_TOP`, and improved while open: the
+cases now cover **both** weather layouts (bars when rain is expected, icon alone
+when not), since testing only one was testing half the column.
+
+It immediately earned its keep by exposing a real design question:
+- [ ] **S** ⚠️ **The umbrella override swallows the weather glyph.** wmo 63 (rain),
+      81 (showers) and 95 (storm) all render an identical umbrella, so a
+      thunderstorm is indistinguishable from drizzle — and `wmo 0 + umbrella`
+      loses the sun entirely on a clear day with rain later. Decide whether the
+      umbrella should replace the glyph, sit beside it, or only override on
+      non-obvious codes
+
+**`curate_art.py` is dead code.** It builds a hand-approved collection from **the
+Met**, which was rejected, and writes `assets/art_collection.json`, which nothing
+reads. Its job is now done better by `museum.py` (automatic) plus `art_veto.py`
+(veto), which is the workflow that was actually chosen.
+- [ ] **S** Delete it, or keep it purely as the record of the Met experiment. The
+      findings themselves are already preserved in `museum.py`'s docstring and in
+      EPIC 6 above, so nothing is lost by deleting
+
+---
+
+## EPIC 7 — Physical ⬜
+
+- [ ] **L** 3D printed frame (separate track, already in progress)
+- [ ] **S** Cable management / permanent mount by the door
+- [ ] **S** Decide whether the Pi is visible or hidden
+
+---
+
+## Suggested order
+
+1. ~~**Metro**~~ ✅ done
+2. ~~**Weather**~~ ✅ done
+3. ~~**Layout redesign (Epic 2.5)**~~ ✅ done
+4. **First light** ← the honest next step. Everything laptop-side is finished
+5. **TickTick** — the only remaining work that does not need hardware
+6. **Make it live** — cron, wiring the push guard into a runner, resilience
+7. **Art** — the treat, once it's already useful
+
+**First light is now the bottleneck, not a nice-to-have.** Across this build I
+flagged five separate judgements as unanswerable from a laptop:
+
+- grey16 vs 1-bit dithering
+- whether the grey-153 hairline rules survive e-ink contrast
+- whether the 76px numerals read from a few steps back
+- whether Literata's finer serifs hold up where a bold sans would
+- how intrusive the `GC16` flash actually is, and whether `DU` is usable
+
+Plus roughly five small vertical-spacing nudges, all judged on a backlit monitor
+at 100% zoom against a 9.7" 150-DPI panel with no backlight. Some of those are
+wrong and there is no way to know which from here. Further tuning before first
+light is guessing dressed up as progress.
+
+---
+
+## Open questions
+
+**Only answerable on the hardware:**
+- grey16 vs 1-bit — decided on the laptop, **not yet settled on glass**
+- Whether the hairline rules (grey 153) survive e-ink contrast at all
+- Are the large numerals readable from a few steps back
+- Do the solid Weather Icons clash with the delicate cross-hatch art above
+- How intrusive the `GC16` flash is, and whether `DU` works well enough to
+  justify partial refresh of the metro column
+
+**Answerable now:**
+- Which typeface — from rendered candidates, not adjectives
+- Whether tabular figures are really unavailable, and whether the jitter matters
+- How many todos actually fit before the column looks cramped
+- Where the repo lives on the Pi and how code gets there
+
+## Locked decisions
+
+**Layout (2026-07-26 redesign):**
+- **Art gets 45%** — this is a dashboard with art, not art with data underneath.
+  A deliberate reversal of the spec's "art gets maximum room"
+- **Absolute metro times** (`08:14`), never relative. They don't go stale between
+  refreshes, and they're what makes push-on-change work
+- **No clock.** A muted `updated HH:MM` bottom-right instead — a clock up to 10
+  minutes wrong is worse than no clock
+- Date top-left · `OUR EXIT SCREEN` bottom-left · updated stamp bottom-right
+- **No `LEAVE BY`** and no walk-time arithmetic
+- Wind is **conditional** — hidden when calm, Beaufort + gusts when notable.
+  No direction arrow; the walk is to an underground platform
+- Weather is **adaptive** — bars + small icon when rain is expected, enlarged icon
+  alone when not. The emptiness on a dry day is itself the signal
+
+**Typography — settled after twelve candidates:**
+- **Literata main + Work Sans supporting.** Serif is the panel's furniture
+  (headings, clock, temperature, nameplate); sans is the data hung on it. Two
+  constants in `theme.py` — `MAIN_FACE` and `SUB_FACE`
+- Work Sans is **humanist** — drawn from calligraphic skeletons, the same
+  tradition as a book serif — so it shares Literata's bone structure. Grotesques
+  share nothing with it, which is why they never quite meshed
+- Rejected, with reasons: **Bricolage Grotesque** (its own quirks competed with
+  the serif instead of supporting it); **Source Sans 3** (meshed, but measured
+  narrowest of eleven at 266px vs Work Sans's 306px — read as cramped)
+- All three columns are labelled **METRO / WEATHER / TO DO**. The weather column
+  originally had no heading, which made its temperature look higher than the
+  metro clock despite sharing a baseline — a missing element reading as a
+  misalignment
+- **Symbols are drawn, never typed.** Arrows and icons are vectors, because a
+  face missing a glyph renders an empty box — and because it frees the typeface
+  choice from glyph coverage
+
+**Refresh:**
+- Render every 5 min 07:00–22:00; **push only when the image changes**
+- ⚠️ **The daily art must be cached, not regenerated per render.** The guard
+  compares rendered pixels, so art that changes every render would break it
+  entirely. The procedural placeholder is seeded and therefore deterministic;
+  real generated art must be cached per day (already planned in Epic 6)
+- Whole-screen `GC16` every push; no partial-refresh path until after first light
+- Daily clear at **06:59**; the 07:00 render bypasses the push guard
+- **The updated stamp must render the data's fetch time, not `now()`** — otherwise
+  every render differs, the hash never matches, and the push guard does nothing
+
+**Architecture:**
+- Renderer stays pure — `frame.py` never imports IT8951, so layout work
+  happens on the laptop
+- **Weather icons come from a bundled icon font**, not hand-drawn vectors.
+  (This reverses an earlier call. The original worry — a missing glyph renders
+  an empty box — applies to *general-purpose* typefaces you don't control. This
+  font ships with the project and every glyph we use has been rendered and
+  checked.) The wind arrow stays hand-drawn: it must rotate to an arbitrary
+  bearing, which a fixed glyph cannot do
+- Every column degrades independently; a dead feed costs one column, not the screen
+- grey16 is the default reduction (pending hardware confirmation)
+- Secrets live in env vars / untracked files, never in git
+
+## Resolved, kept for reference
+
+- **Stoparea vs single TPC** → single TPC `<stop code>`, which turned out to
+  already be the direction we ride, so no direction filter is needed

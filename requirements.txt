@@ -1,0 +1,14 @@
+# Laptop + Pi shared dependencies.
+#
+# The renderer is pure Pillow and never imports IT8951, so this file installs
+# and runs identically on Windows and on the Pi.
+#
+# The IT8951 panel driver is Pi-only (it compiles against linux/spi/spidev.h
+# and imports RPi.GPIO) and gets its own requirements file when we deploy.
+
+pillow>=10.0
+requests>=2.31
+
+# Windows ships no system timezone database, so zoneinfo cannot resolve
+# "Europe/Amsterdam" without this. Harmless on the Pi, which has its own.
+tzdata; sys_platform == "win32"

@@ -1,0 +1,26 @@
+# exitscreen schedule — install with:
+#   ( crontab -l 2>/dev/null | grep -v 'exitscreen/run.py' ; cat deploy/crontab ) | crontab -
+#
+# Every run fetches and renders; run.py pushes to the panel only when the
+# rendered image differs from the last one pushed. So a 5-minute cadence costs
+# almost nothing: on a quiet afternoon most runs end in "no change".
+#
+# Why 5 minutes rather than 10, when the metro feed is only polled every 10:
+# a delayed train changes the frame as soon as OVapi knows about it, rather than
+# waiting for a fixed cycle. The guard makes the extra runs free.
+
+# Render every 5 minutes while anyone is awake (07:00–21:55).
+*/5 7-21 * * * cd /home/exitscreen/exitscreen && /home/exitscreen/venv/bin/python run.py >> /home/exitscreen/exitscreen.log 2>&1
+
+# One more at 22:00 to close the window, since */5 7-21 stops at 21:55.
+0 22 * * * cd /home/exitscreen/exitscreen && /home/exitscreen/venv/bin/python run.py >> /home/exitscreen/exitscreen.log 2>&1
+
+# 06:59 — daily ghost-clear, then an immediate forced redraw. Clearing leaves the
+# panel white, so --clear implies --force; otherwise the guard would see an
+# unchanged image, skip the push, and leave the display blank all day.
+59 6 * * * cd /home/exitscreen/exitscreen && /home/exitscreen/venv/bin/python run.py --clear >> /home/exitscreen/exitscreen.log 2>&1
+
+# After a reboot: wait for NTP before drawing. This Pi has no RTC, so at boot it
+# believes it is some time in the past — every departure would look "already
+# gone" and get filtered out, leaving an empty metro column.
+@reboot cd /home/exitscreen/exitscreen && /home/exitscreen/venv/bin/python run.py --wait-for-clock --force >> /home/exitscreen/exitscreen.log 2>&1
