@@ -1,4 +1,7 @@
-"""Open tasks from one TickTick list.
+"""Today's tasks from one TickTick list.
+
+Today's, not all open ones - see parse(). A task due next month is not something
+you need to know on the way out of the door.
 
 Verified against the live API on 2026-07-27:
   - `GET /open/v1/project/{id}/data` returns {project, tasks, columns}.
@@ -62,15 +65,13 @@ TRAVEL_TAG = re.compile(r"#(\d{1,3})\s*m\b", re.IGNORECASE)
 TRAVEL_TAG_ONLY = re.compile(r"^(\d{1,3})\s*m$", re.IGNORECASE)
 
 
-def _parse_due(task: dict) -> datetime | None:
-    """The task's clock time in Amsterdam, or None if it has none.
+def _due(task: dict) -> datetime | None:
+    """When the task is due, in Amsterdam. All-day tasks land at local midnight.
 
-    All-day tasks return None: "buy bread today" has no time to leave for. See
-    the module docstring for why the conversion is not optional.
+    The conversion is not optional - see the module docstring. An all-day task
+    due 27 July arrives as 2026-07-26T22:00:00+0000, whose *naive* date is the
+    26th. Reading the date without converting first is off by one.
     """
-    if task.get("isAllDay"):
-        return None
-
     raw = task.get("dueDate") or task.get("startDate")
     if not raw:
         return None
@@ -79,6 +80,15 @@ def _parse_due(task: dict) -> datetime | None:
         return datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(TZ)
     except ValueError:
         return None
+
+
+def _clock_time(task: dict) -> datetime | None:
+    """The due moment, but only when it is a real time of day.
+
+    All-day tasks return None: "buy bread today" has no time to leave for, so it
+    gets no inline time and no leave-by line.
+    """
+    return None if task.get("isAllDay") else _due(task)
 
 
 def _travel_minutes(task: dict) -> int | None:
@@ -124,15 +134,23 @@ def _labels(
 def parse(
     payload: dict, limit: int = 4, now: datetime | None = None
 ) -> tuple[list[Task], int]:
-    """Return (tasks to show, total open count).
+    """Return (today's tasks to show, how many there are in total).
 
-    The total drives the "+N more" line, so it counts every open task rather
+    **Only tasks dated today.** The panel answers "what do I need before I walk
+    out", so a task due next month is noise on the door - the list used to show
+    everything open, including a lunch a month away. Deliberate consequences:
+    undated tasks never appear, and neither do overdue ones. Put a date on it or
+    the door stays quiet about it.
+
+    The total drives the "+N more" line, so it counts every task due today rather
     than only the ones that fit.
 
     `now` is a parameter rather than read inside, mirroring metro.parse() - it
-    makes the leave-by boundary testable instead of only observable at 18:25.
+    makes both the date boundary and the leave-by boundary testable instead of
+    only observable at midnight and at 18:25.
     """
     now = now or datetime.now(TZ)
+    today = now.date()
     raw_tasks = payload.get("tasks") or []
 
     open_tasks = [
@@ -147,7 +165,11 @@ def parse(
 
     tasks = []
     for t in open_tasks:
-        due = _parse_due(t)
+        when = _due(t)
+        if when is None or when.date() != today:
+            continue
+
+        due = _clock_time(t)
         travel_min = _travel_minutes(t)
         at, note = _labels(due, travel_min, now)
         # Strip the tag so the panel reads "Dentist", not "Dentist #40m".

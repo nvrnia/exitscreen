@@ -306,6 +306,34 @@ see the leave-by section under EPIC 3. A live clock is still rejected.
   to `Europe/Amsterdam` before reading a date or an hour off it. The separate
   `timeZone` field is the user's own zone and is not needed
 
+### Today only — built 2026-07-31
+
+The column was showing **every** open task. With a real list that meant a lunch
+dated 29 August sat on the front door under a heading that means "before you walk
+out". `parse()` now keeps only tasks whose due date, converted to Amsterdam, is
+today.
+
+- [x] `_due()` gets the due moment for **any** task, all-day included; `_clock_time()`
+      is the narrower one that returns None for all-day, and still drives the
+      inline time and the leave-by line
+- [x] ⚠️ The off-by-one is handled and tested: an all-day task due 31 July arrives
+      as `2026-07-30T22:00:00+0000`, so the date must be read **after** converting
+      to Amsterdam. Reading it naively hides today's tasks and shows yesterday's
+- [x] `todo_total` counts today's tasks, so "+N more" cannot promise tasks that
+      are not on today's list
+
+**Chosen consequences, not oversights:**
+- **Undated tasks never appear.** Jot "buy bread" with no date and the door stays
+  quiet about it. This was picked deliberately over including undated ones
+- **Overdue tasks never appear** either — dated before today means gone
+- A task dated *today* but whose time has passed (due 00:30, seen at 09:00) **is**
+  shown. It is due today, which is the rule; "overdue" means an earlier date
+
+**Done when:** the column shows only what actually matters before leaving.
+Currently that is nothing, and it correctly renders "nothing to do".
+
+---
+
 ### Leave-by times on timed tasks — built 2026-07-30
 
 The one feature on the panel that changes behaviour rather than just informing.

@@ -24,10 +24,11 @@ train at all.
 to take an umbrella, and a little bar chart of the next eight hours' rain chance
 that only shows up when rain is actually coming.
 
-**To do** — our shared TickTick list. If a task has a time on it and a `#40m`
-tag saying how long it takes to get there, it gets a second line: `leave by
-18:25`. That tag is door-to-door minutes, and we know that number better than any
-API does.
+**To do** — our shared TickTick list, but only what's dated today. Anything
+undated or further out stays in the app where it belongs; the door is for things
+that matter on the way out. If a task has a time on it and a `#40m` tag saying how
+long it takes to get there, it gets a second line: `leave by 18:25`. That tag is
+door-to-door minutes, and we know that number better than any API does.
 
 **Art** — a public domain painting a day from the Cleveland Museum of Art,
 greyscaled and cropped to fit. Same painting all day, picked by date. If one
