@@ -49,6 +49,29 @@ def _text(d, x, baseline, string, font, fill=T.BLACK):
     d.text((x, baseline), string, font=font, fill=fill, anchor="ls")
 
 
+def _outline(d, box, radius: int, fill=T.DIVIDER):
+    """A hairline rectangle, rounded when the theme asks for it."""
+    if radius > 0:
+        d.rounded_rectangle(box, radius=radius, outline=fill, width=1)
+    else:
+        d.rectangle(box, outline=fill, width=1)
+
+
+def _corner_mask(width: int, height: int, radius: int) -> Image.Image | None:
+    """A paste mask that rounds an image's corners. None means leave it square.
+
+    Anti-aliased, so the curve does not read as a staircase once the frame is
+    quantised to 16 greys.
+    """
+    if radius <= 0:
+        return None
+    mask = Image.new("L", (width, height), 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        [0, 0, width - 1, height - 1], radius=radius, fill=255
+    )
+    return mask
+
+
 def _supports_dash() -> bool:
     """%-d is glibc-only; Windows needs the manual form."""
     try:
@@ -322,26 +345,22 @@ def build_frame(
     img = Image.new("L", (T.WIDTH, T.HEIGHT), T.PAPER)
     d = ImageDraw.Draw(img)
 
-    # art, filling its box
+    # art, filling its box. Masked to the same radius as its border, or the
+    # painting's square corners would poke out past a rounded one.
     if art is None:
         art = art_module.placeholder(T.ART_W, T.ART_H)
     if art.mode != "L":
         art = art.convert("L")
     if art.size != (T.ART_W, T.ART_H):
         art = art.resize((T.ART_W, T.ART_H), Image.LANCZOS)
-    img.paste(art, (T.ART_LEFT, T.ART_TOP))
+    img.paste(art, (T.ART_LEFT, T.ART_TOP), _corner_mask(T.ART_W, T.ART_H,
+                                                         T.ART_RADIUS))
 
     # the plate, and a crisp border around the art drawn over it
-    d.rectangle(
-        [T.FRAME_LEFT, T.FRAME_TOP, T.FRAME_RIGHT, T.FRAME_BOTTOM],
-        outline=T.DIVIDER,
-        width=1,
-    )
-    d.rectangle(
-        [T.ART_LEFT - 1, T.ART_TOP - 1, T.ART_RIGHT, T.ART_BOTTOM],
-        outline=T.DIVIDER,
-        width=1,
-    )
+    _outline(d, [T.FRAME_LEFT, T.FRAME_TOP, T.FRAME_RIGHT, T.FRAME_BOTTOM],
+             T.FRAME_RADIUS)
+    _outline(d, [T.ART_LEFT - 1, T.ART_TOP - 1, T.ART_RIGHT, T.ART_BOTTOM],
+             T.ART_RADIUS)
 
     _draw_topbar(d, f, data)
     _draw_caption_topbar(d, f, data)

@@ -32,16 +32,28 @@ DIVIDER = 153  # hairline rules
 # A hairline border around the whole panel, like a printed plate.
 
 FRAME_INSET = 14
-FRAME_PAD = 18
+# 24, not 18: a 36px corner radius eats into the margin diagonally. At 18 the
+# date sat 18px from the straight edge but only 13px from the curve, which is
+# what made the corners look crowded once they were rounded.
+FRAME_PAD = 24
 
 FRAME_LEFT = FRAME_INSET  # 14
 FRAME_TOP = FRAME_INSET  # 14
 FRAME_RIGHT = WIDTH - FRAME_INSET  # 1186
 FRAME_BOTTOM = HEIGHT - FRAME_INSET  # 811
 
-CONTENT_LEFT = FRAME_LEFT + FRAME_PAD  # 32
-CONTENT_RIGHT = FRAME_RIGHT - FRAME_PAD  # 1168
+CONTENT_LEFT = FRAME_LEFT + FRAME_PAD  # 38
+CONTENT_RIGHT = FRAME_RIGHT - FRAME_PAD  # 1162
 MARGIN_X = CONTENT_LEFT
+
+# Rounded to match the physical bezel. Square corners inside a rounded surround
+# read as a mistake rather than a choice. 0 goes back to sharp.
+#
+# The art box stays square on purpose: rounding it clipped a visible bite out of
+# each corner of the painting, and a crisp rectangle reads like a print in a
+# mount rather than a widget.
+FRAME_RADIUS = 36
+ART_RADIUS = 0
 
 # --- vertical bands ------------------------------------------------------
 # Stacked inside the frame with deliberate gaps between them:
@@ -187,7 +199,9 @@ ART_FLAT_THRESHOLD = 45
 # nameplate below it, and the last column ends flush at CONTENT_RIGHT. Padding
 # applies only where two columns meet.
 
-COL_EDGES = (32, 411, 755, 1168)
+# Scaled with CONTENT_LEFT/RIGHT when the padding grew for the rounded corners;
+# the 1.1 / 1 / 1.2 proportions are unchanged.
+COL_EDGES = (38, 413, 753, 1162)
 COL_GUTTER = 22
 
 

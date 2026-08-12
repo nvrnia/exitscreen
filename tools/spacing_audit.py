@@ -112,8 +112,19 @@ def main():
     px = img.load()
 
     def first_ink_x(y0, y1):
-        # start inside the frame border, or every answer is the frame
-        for x in range(T.FRAME_LEFT + 4, T.WIDTH):
+        # Start inside the frame border, or every answer is the frame. With a
+        # rounded corner the border curves *inward* across these rows, so the
+        # scan has to clear the arc as well as the straight edge - otherwise the
+        # date and nameplate both report the curve instead of themselves.
+        start = T.FRAME_LEFT + 4
+        if T.FRAME_RADIUS:
+            near_corner = (
+                y0 < T.FRAME_TOP + T.FRAME_RADIUS
+                or y1 > T.FRAME_BOTTOM - T.FRAME_RADIUS
+            )
+            if near_corner:
+                start = max(start, T.FRAME_LEFT + T.FRAME_RADIUS // 2)
+        for x in range(start, T.WIDTH):
             for y in range(y0, y1):
                 if px[x, y] < INK_THRESHOLD:
                     return x
