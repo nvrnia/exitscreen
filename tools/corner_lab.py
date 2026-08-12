@@ -22,22 +22,40 @@ from exitscreen import eink, frame, theme  # noqa: E402
 
 OUT = ROOT / "out"
 
-# (frame radius, art radius). 0/0 is what it looked like before.
-PAIRS = [(0, 0), (10, 7), (18, 12), (26, 18), (36, 24)]
+# (frame radius, content padding). The padding has to grow with the radius or the
+# corner curve eats into the margin diagonally and the date looks crowded again -
+# measured at ~17px of clearance, which is what 36/24 gives.
+PAIRS = [(36, 24), (48, 27), (60, 30), (72, 34)]
 
 ZOOM = 3
 CROP = (0, 0, 150, 130)  # the top-left corner, where both curves meet
 
 
-def render(frame_radius: int, art_radius: int, art=None) -> Image.Image:
-    frame_before, art_before = theme.FRAME_RADIUS, theme.ART_RADIUS
-    theme.FRAME_RADIUS, theme.ART_RADIUS = frame_radius, art_radius
+def render(frame_radius: int, pad: int, art=None) -> Image.Image:
+    """Render at a radius and padding, restoring the theme afterwards.
+
+    Padding ripples through CONTENT_LEFT/RIGHT, the art box and the columns, so
+    all of those are recomputed and put back.
+    """
+    saved = {name: getattr(theme, name) for name in (
+        "FRAME_RADIUS", "FRAME_PAD", "CONTENT_LEFT", "CONTENT_RIGHT", "MARGIN_X",
+        "ART_LEFT", "ART_RIGHT", "ART_W", "COL_EDGES")}
     try:
+        theme.FRAME_RADIUS = frame_radius
+        theme.FRAME_PAD = pad
+        theme.CONTENT_LEFT = theme.FRAME_LEFT + pad
+        theme.CONTENT_RIGHT = theme.FRAME_RIGHT - pad
+        theme.MARGIN_X = theme.CONTENT_LEFT
+        theme.ART_LEFT = theme.CONTENT_LEFT
+        theme.ART_RIGHT = theme.CONTENT_RIGHT
+        theme.ART_W = theme.ART_RIGHT - theme.ART_LEFT
+        theme.COL_EDGES = theme._col_edges()
         return eink.reduce(
             frame.build_frame(frame.sample_data(), art=art), "grey16"
         )
     finally:
-        theme.FRAME_RADIUS, theme.ART_RADIUS = frame_before, art_before
+        for name, value in saved.items():
+            setattr(theme, name, value)
 
 
 def real_art():
@@ -56,12 +74,12 @@ def corners() -> Path:
     sheet = Image.new("L", (w * len(PAIRS), h + 30), theme.PAPER)
     d = ImageDraw.Draw(sheet)
 
-    for i, (fr, ar) in enumerate(PAIRS):
-        crop = render(fr, ar).crop(CROP).resize((w, h), Image.NEAREST)
+    for i, (radius, pad) in enumerate(PAIRS):
+        crop = render(radius, pad).crop(CROP).resize((w, h), Image.NEAREST)
         sheet.paste(crop, (i * w, 0))
-        label = "square (before)" if fr == 0 else f"frame {fr} / art {ar}"
+        label = f"radius {radius} / pad {pad}"
         d.text((i * w + 8, h + 8), label, font=label_font, fill=theme.BLACK)
-        print(f"  frame {fr:>2} / art {ar:>2}   {label}")
+        print(f"  {label}")
 
     OUT.mkdir(parents=True, exist_ok=True)
     path = OUT / "corners.png"
@@ -73,10 +91,10 @@ def frames() -> Path:
     OUT.mkdir(parents=True, exist_ok=True)
     art = real_art()
     print("  using today's artwork" if art is not None else "  using placeholder")
-    for fr, ar in PAIRS:
-        path = OUT / f"corner_{fr}_{ar}.png"
-        render(fr, ar, art=art).save(path)
-        print(f"  wrote {path.name}")
+    for radius, pad in PAIRS:
+        path = OUT / f"corner_r{radius}.png"
+        render(radius, pad, art=art).save(path)
+        print(f"  radius {radius:>2}  pad {pad}  ->  {path.name}")
     return OUT
 
 

@@ -32,10 +32,13 @@ DIVIDER = 153  # hairline rules
 # A hairline border around the whole panel, like a printed plate.
 
 FRAME_INSET = 14
-# 24, not 18: a 36px corner radius eats into the margin diagonally. At 18 the
-# date sat 18px from the straight edge but only 13px from the curve, which is
-# what made the corners look crowded once they were rounded.
-FRAME_PAD = 24
+# A rounded corner eats the margin *diagonally*, so the corner text needs to come
+# in on both axes. Widening this alone hit diminishing returns - measured at a
+# 48px radius, padding 27 -> 34 only moved the clearance 14.2 -> 17.3px, because
+# the date's distance from the *top* edge was the binding constraint. Pulling the
+# top bar and footer baselines inward as well got it to ~21px for a third of the
+# horizontal cost. See TOPBAR_BASE and FOOTER_BASE.
+FRAME_PAD = 30
 
 FRAME_LEFT = FRAME_INSET  # 14
 FRAME_TOP = FRAME_INSET  # 14
@@ -52,7 +55,7 @@ MARGIN_X = CONTENT_LEFT
 # The art box stays square on purpose: rounding it clipped a visible bite out of
 # each corner of the painting, and a crisp rectangle reads like a print in a
 # mount rather than a widget.
-FRAME_RADIUS = 36
+FRAME_RADIUS = 48
 ART_RADIUS = 0
 
 # --- vertical bands ------------------------------------------------------
@@ -72,13 +75,17 @@ ART_RADIUS = 0
 # 76px clock plus two lines under it without the descenders colliding.
 
 TOPBAR_TOP = 14
-TOPBAR_H = 44
-# Baseline 50, not 44: centred in the *visual* gap between the frame edge and the
-# art box (14..68), rather than in the nominal 44px band. At 44 the date sat 13px
-# below the frame and 24px above the art, which reads as riding high.
-TOPBAR_BASE = 50
+TOPBAR_H = 50
+# Baseline 56, not 50: the rounded corner cuts across this band diagonally, and
+# the date sitting only 19px below the frame edge was what made the corner look
+# crowded. 6px down buys ~5px of diagonal clearance - far more per pixel than
+# widening FRAME_PAD does. The date is all caps and digits, so it has no
+# descenders to collide with the art box.
+TOPBAR_BASE = 56
 
-ART_TOP = 68
+# 74, not 68: follows the date down, so the top bar keeps roughly even gaps above
+# and below it rather than pinning the date against the art.
+ART_TOP = 74
 ART_BOTTOM = 518
 ART_H = ART_BOTTOM - ART_TOP  # 450
 ART_LEFT = CONTENT_LEFT
@@ -88,7 +95,9 @@ ART_W = ART_RIGHT - ART_LEFT  # 1136
 DECISION_TOP = 530  # the rule sits on this line
 FOOTER_TOP = 759  # and on this one
 
-FOOTER_BASE = 792  # baseline, optically centred in the footer band
+# 786, not 792: same reasoning as TOPBAR_BASE, at the other two corners. The
+# nameplate and the freshness stamp both sit in a rounded corner's path.
+FOOTER_BASE = 786
 
 # --- baselines inside the decision row -----------------------------------
 # The two lines that matter for cross-column alignment are shared: the column
@@ -199,9 +208,22 @@ ART_FLAT_THRESHOLD = 45
 # nameplate below it, and the last column ends flush at CONTENT_RIGHT. Padding
 # applies only where two columns meet.
 
-# Scaled with CONTENT_LEFT/RIGHT when the padding grew for the rounded corners;
-# the 1.1 / 1 / 1.2 proportions are unchanged.
-COL_EDGES = (38, 413, 753, 1162)
+# Derived rather than hardcoded, so changing FRAME_PAD (which the corner radius
+# forces) reflows the columns instead of needing them recalculated by hand.
+COL_RATIOS = (1.1, 1.0, 1.2)
+
+
+def _col_edges() -> tuple[int, ...]:
+    span = CONTENT_RIGHT - CONTENT_LEFT
+    scale = span / sum(COL_RATIOS)
+    edges = [CONTENT_LEFT]
+    for ratio in COL_RATIOS[:-1]:
+        edges.append(round(edges[-1] + ratio * scale))
+    edges.append(CONTENT_RIGHT)
+    return tuple(edges)
+
+
+COL_EDGES = _col_edges()
 COL_GUTTER = 22
 
 
