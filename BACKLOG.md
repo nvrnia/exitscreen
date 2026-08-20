@@ -477,41 +477,64 @@ Turning a script into an appliance.
       nothing is being written during normal operation. The log is diagnostic
       only and losing it on reboot costs nothing
 
-### Incident 2026-08-20 — repeated dropouts, and a blank-frame bug
+### Incident 2026-08-20 — repeated dropouts. It was never the SD card
 
-The Pi died overnight after the 22:00 run, came back for exactly one boot after
-the SD card was reseated, then dropped off the network again. Currently
-unresolved.
+The Pi died overnight after the 22:00 run, then kept dropping off the network,
+sometimes showing red-LED-with-no-green. Resolved by power cycling; back up and
+rendering the same day.
 
-**Correction to the 2026-07-28 entry.** That one concluded "reflash early".
-That is probably the wrong lesson: reseating the card fixed it this time without
-any reflash, and reflashing necessarily involves removing and reinserting the
-card. The reflash may always have been incidental.
+⚠️ **`dmesg` settled it, and it was not the card.** When it does boot, the card
+reads perfectly - no I/O errors, no retries, both partitions found:
 
-- **Reseat first, then reflash.** Cheaper and, on this evidence, likelier
-- Two mystery deaths both cured by reseating points at a **poor mechanical fit**
-  in the slot, not at data corruption. A shim or tape is worth trying
-- [ ] **M** ⚠️ Still dropping off after one boot. Not diagnosed. Next time it is
-  up, check `dmesg` for card I/O errors and `journalctl -b -1` for what happened
-  before it went
+```
+mmcblk0: mmc0:aaaa SD32G 29.7 GiB
+ mmcblk0: p1 p2
+EXT4-fs (mmcblk0p2): re-mounted ... r/w.
+```
 
-**The blank-frame bug this exposed.** With the panel showing an empty METRO and
-WEATHER, it looked like the feeds were broken. They were not:
+The telling line is `EXT4-fs (mmcblk0p2): orphan cleanup on readonly fs`. That is
+the filesystem repairing itself at boot, and it **only happens after an unclean
+shutdown**. So the Pi is losing power or hard-stopping, not failing to read.
+
+That explains every symptom, including the ones blamed on the card:
+- red LED on, green never lighting - a half-powered board does not read the card
+- coming back after "reseating" - the fix was the power cycle, not the reseat
+- dying unattended between 22:00 and 06:59
+
+**Both earlier diagnoses were wrong**, and in the same direction. 2026-07-28
+concluded the card was dead and reflashing fixed it; 2026-08-20 first concluded a
+poor mechanical fit in the slot. Reflashing and reseating both involve a power
+cycle, which is what was actually doing the work each time.
+
+**Rule, replacing "reflash early":** on a Pi that will not boot, **power cycle
+properly first** - unplug, wait, replug. Only then reseat, and only then reflash.
+And check `dmesg` for `mmc`/`I/O error` before concluding anything about the card;
+it is one command and it would have saved two wrong diagnoses.
+
+- [ ] **S** ⚠️ **Prime suspect: the 5V supply.** Never swapped. An intermittent
+      brown-out fits everything. `vcgencmd get_throttled` reads `0x0`, but that
+      only covers the current boot - a supply that sags hard enough to kill the
+      board may never live long enough to record it
+- [ ] **S** Enable a persistent journal (`Storage=persistent`, capped at 50M).
+      `journalctl -b -1` currently returns "no persistent journal was found", so
+      we have never once seen what happened *before* a death
+- [ ] **S** Move the log and cache to tmpfs - unclean power loss is now confirmed
+      to be happening regularly, and the log is written every 5 minutes
+
+**The blank-frame bug this exposed.** With METRO and WEATHER empty it looked like
+the feeds had broken. They had not:
 
 1. `@reboot` runs `run.py --wait-for-clock --force`
-2. On a boot that beats the wifi, `wait_for_clock()` times out after 180s and
-   logs "clock NOT synced - continuing"
-3. Every feed then fails, and metro/weather caches are past their staleness
-   limit, so they are rejected rather than served stale - correctly
-4. **`--force` pushed that empty frame anyway**, over a perfectly good one, where
-   it then sat until the next successful run
+2. On a boot that beats the wifi, `wait_for_clock()` times out after 180s
+3. Every feed then fails, and metro/weather caches are past their staleness limit
+   so they are correctly rejected rather than served stale
+4. **`--force` pushed that empty frame over a good one**, where it sat until the
+   next successful run
 
 - [x] Fixed: `run.py` refuses to push when weather is None *and* there are no
-      departures - both dead means every feed failed. A stale frame beats an
-      empty one. `--clear` is exempt, since it has already whited the panel and
-      must draw something
-- [ ] **S** Consider making `--wait-for-clock` wait for *network* rather than
-      NTP specifically, or retry the fetches once it is up
+      departures - both dead means every feed failed. `--clear` is exempt, having
+      already whited the panel. `todo` is deliberately excluded from the test,
+      since an empty to-do list is legitimate
 
 ---
 
