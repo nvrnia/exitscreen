@@ -155,6 +155,21 @@ def main() -> int:
         log(f"dry run : {digest} -> {path}")
         return 0
 
+    # Never replace a good frame with an empty one.
+    #
+    # If metro AND weather both came back with nothing, every feed failed - the
+    # caches have a staleness limit and stop serving old data past it. In
+    # practice that means a boot that beat the wifi: @reboot runs with --force,
+    # so without this guard it would push a blank frame over a perfectly good
+    # one, and that blank would sit on the door until the next successful run.
+    # A stale frame is far better than an empty one.
+    #
+    # --clear is exempt: it has already whited the panel, so it must draw
+    # something or the display is left blank, which is worse.
+    if data.weather is None and not data.departures and not args.clear:
+        log("no live data - every feed failed. Panel left as it was")
+        return 0
+
     # A clear leaves the panel white, so the frame must be redrawn even if it is
     # identical to what was there before - otherwise the guard would skip it and
     # leave the display blank.
