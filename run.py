@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -58,6 +59,33 @@ def wait_for_clock(timeout: int = 180) -> bool:
             return True
         time.sleep(5)
     return False
+
+
+def single_instance():
+    """Refuse to run twice at once, returning the lock or None.
+
+    Two processes driving the panel over SPI at the same time gives
+    "lgpio.error: 'GPIO busy'" and a failed render - seen in the log when a
+    manual run collided with the 5-minute cron job. A slow feed can cause the
+    same overlap unattended, so this is not only a hand-operation problem.
+
+    The lock lives in the temp dir, which is tmpfs on the Pi, so this costs no
+    SD card writes. The returned handle must stay referenced for the lifetime of
+    the run - closing it releases the lock.
+    """
+    try:
+        import fcntl
+    except ImportError:
+        # Windows: previews and --dry-run only, no hardware to collide over.
+        return True
+
+    handle = open(Path(tempfile.gettempdir()) / "exitscreen.lock", "w")
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return None
+    return handle
 
 
 def freshest_fetch() -> datetime:
@@ -142,6 +170,12 @@ def main() -> int:
     if args.wait_for_clock:
         log("waiting for NTP ...")
         log("clock synced" if wait_for_clock() else "clock NOT synced - continuing")
+
+    # Held for the whole run; see single_instance().
+    lock = single_instance()
+    if lock is None:
+        log("another run is already going - skipping this one")
+        return 0
 
     data = gather()
     art_image, data.artwork = gather_art()

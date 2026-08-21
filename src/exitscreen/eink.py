@@ -65,11 +65,17 @@ def levels_used(img: Image.Image) -> int:
 def frame_digest(img: Image.Image) -> str:
     """A stable fingerprint of the reduced frame, for the push guard.
 
-    The runner renders every 5 minutes but the metro feed is only polled every
-    10, so roughly half of all renders produce a byte-identical frame. Comparing
-    this digest against the last pushed one means the panel only flashes when
-    something actually changed - no wasted 1-3 second refresh, and a delayed
-    train still appears sooner than a fixed 10-minute cycle would allow.
+    Comparing this digest against the last pushed one means the panel only
+    flashes when something actually changed, and a delayed train still appears
+    sooner than a fixed 10-minute cycle would allow.
+
+    This docstring used to claim "roughly half of all renders produce a
+    byte-identical frame". Measured, that is wrong: trains run every 3-4 minutes
+    at the home stop and parse() recomputes against now() rather than against
+    the fetch, so the displayed pair rolls over about every 4 minutes - against a
+    5-minute cadence. During service hours the guard rarely gets to skip. It is
+    still worth having: it is what stops a *static* frame being redrawn, which is
+    most of the night and any quiet stretch.
 
     Digest the *reduced* image, not the source: two frames that differ only in
     tones the panel cannot show are the same frame as far as the panel cares.

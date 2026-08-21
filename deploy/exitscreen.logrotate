@@ -1,0 +1,22 @@
+# Keep exitscreen.log from growing without limit.
+#
+#   sudo cp deploy/exitscreen.logrotate /etc/logrotate.d/exitscreen
+#
+# The log gets a line every five minutes, so it grows by a few MB a year on a
+# card we would rather not write to more than necessary. It is diagnostic only -
+# tools/pi_doctor.py reconstructs the crash history from it, so a few weeks of
+# history is worth keeping and anything older is not.
+#
+# copytruncate matters: cron holds the file open with >>, so rotating by rename
+# would leave the running job writing to a file nobody can see.
+
+/home/exitscreen/exitscreen.log {
+    weekly
+    rotate 4
+    size 2M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
