@@ -98,9 +98,35 @@ def storage() -> None:
 
 def wifi() -> None:
     head("WIFI")
-    print(f"  {run('iw dev wlan0 link') or run('iwconfig wlan0 2>/dev/null') or '  no wlan0'}")
-    drops = run("dmesg | grep -iE 'wlan0|brcmfmac|deauth|disconnect' | tail -8")
-    print(f"\n{drops or '  nothing in dmesg about wifi'}")
+
+    # /usr/sbin is not on PATH for a non-login ssh shell, so `iw` reports
+    # "command not found" while being perfectly well installed. Full path.
+    power = run("/usr/sbin/iw wlan0 get power_save 2>/dev/null")
+    print("  power save : " + (power or "unknown"))
+    if "on" in power.lower():
+        print("  !! Power saving lets the radio drop its association and never")
+        print("     re-associate. The Pi stays up and cron keeps running, every")
+        print("     fetch fails, and the screen freezes on its last good frame.")
+        print("     Fix, which survives netplan regenerating the connection:")
+        print("       /etc/NetworkManager/conf.d/wifi-powersave-off.conf")
+        print("       [connection]")
+        print("       wifi.powersave = 2")
+
+    def block(title, text, empty):
+        print("")
+        print("  " + title)
+        print("   " + (text.replace("\n", "\n   ") if text else empty))
+
+    block("link:", run("/usr/sbin/iw dev wlan0 link 2>/dev/null"), "unknown")
+    block("signal:", run("grep wlan0 /proc/net/wireless"), "unknown")
+
+    # What the driver actually did beats what the config claims. Expect a pair:
+    # "power save enabled" at boot, then "disabled" once NetworkManager applies
+    # the drop-in a few seconds later.
+    block("driver, this boot:", run("dmesg | grep -i power_mgmt | tail -4"),
+          "nothing logged")
+    block("disconnect events:",
+          run("dmesg | grep -iE 'deauth|disconnect|link down' | tail -6"), "none")
 
 
 def journal() -> None:

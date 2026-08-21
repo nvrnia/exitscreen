@@ -477,64 +477,65 @@ Turning a script into an appliance.
       nothing is being written during normal operation. The log is diagnostic
       only and losing it on reboot costs nothing
 
-### Incident 2026-08-20 — repeated dropouts. It was never the SD card
+### Incident 2026-08-21 — SOLVED: wifi power saving. Never the hardware
 
-The Pi died overnight after the 22:00 run, then kept dropping off the network,
-sometimes showing red-LED-with-no-green. Resolved by power cycling; back up and
-rendering the same day.
+The panel kept freezing and the Pi kept becoming unreachable. Diagnosed wrong
+three times - dead SD card, loose SD card, failing power supply - before the
+evidence was actually gathered rather than inferred.
 
-⚠️ **`dmesg` settled it, and it was not the card.** When it does boot, the card
-reads perfectly - no I/O errors, no retries, both partitions found:
+**The cause.** Raspberry Pi OS enables wifi power management on `wlan0` by
+default. The radio drops its association and never re-associates. Confirmed
+directly from the driver:
 
 ```
-mmcblk0: mmc0:aaaa SD32G 29.7 GiB
- mmcblk0: p1 p2
-EXT4-fs (mmcblk0p2): re-mounted ... r/w.
+brcmfmac: brcmf_cfg80211_set_power_mgmt: power save enabled
 ```
 
-The telling line is `EXT4-fs (mmcblk0p2): orphan cleanup on readonly fs`. That is
-the filesystem repairing itself at boot, and it **only happens after an unclean
-shutdown**. So the Pi is losing power or hard-stopping, not failing to read.
+**The Pi never crashed.** It stayed up, cron kept firing every five minutes, and
+every fetch failed. `run.py`'s blank-frame guard then correctly held the last
+good frame - so the visible symptom was a frozen screen, which looks exactly like
+a dead machine. 40 `no live data` lines in the log, on the five-minute cadence,
+are what proved it was alive the whole time.
 
-That explains every symptom, including the ones blamed on the card:
-- red LED on, green never lighting - a half-powered board does not read the card
-- coming back after "reseating" - the fix was the power cycle, not the reseat
-- dying unattended between 22:00 and 06:59
+**The fix**, as a NetworkManager drop-in rather than `nmcli` on the connection.
+The connection is named `netplan-wlan0-...`, meaning netplan generates it and can
+regenerate it on boot, wiping a per-connection setting. A global drop-in cannot
+be overwritten that way:
 
-**Both earlier diagnoses were wrong**, and in the same direction. 2026-07-28
-concluded the card was dead and reflashing fixed it; 2026-08-20 first concluded a
-poor mechanical fit in the slot. Reflashing and reseating both involve a power
-cycle, which is what was actually doing the work each time.
+```
+/etc/NetworkManager/conf.d/wifi-powersave-off.conf
+[connection]
+wifi.powersave = 2
+```
 
-**Rule, replacing "reflash early":** on a Pi that will not boot, **power cycle
-properly first** - unplug, wait, replug. Only then reseat, and only then reflash.
-And check `dmesg` for `mmc`/`I/O error` before concluding anything about the card;
-it is one command and it would have saved two wrong diagnoses.
+- [x] Verified across a reboot. `dmesg` now shows the pair - driver enables it at
+      boot, NetworkManager disables it three seconds later - and
+      `/usr/sbin/iw wlan0 get power_save` reports `Power save: off`
 
-- [ ] **S** ⚠️ **Prime suspect: the 5V supply.** Never swapped. An intermittent
-      brown-out fits everything. `vcgencmd get_throttled` reads `0x0`, but that
-      only covers the current boot - a supply that sags hard enough to kill the
-      board may never live long enough to record it
-- [ ] **S** Enable a persistent journal (`Storage=persistent`, capped at 50M).
-      `journalctl -b -1` currently returns "no persistent journal was found", so
-      we have never once seen what happened *before* a death
-- [ ] **S** Move the log and cache to tmpfs - unclean power loss is now confirmed
-      to be happening regularly, and the log is written every 5 minutes
+**What the crash history actually showed** (`tools/pi_doctor.py`): three outages
+in three weeks across 14,890 log entries, and **every one of them was us** -
+deliberate shutdowns and debugging reboots. There was never a spontaneous crash.
 
-**The blank-frame bug this exposed.** With METRO and WEATHER empty it looked like
-the feeds had broken. They had not:
+**How three diagnoses went wrong, so it does not happen again:**
+- **The green LED means SD card activity, not "booted".** An idle, running Pi has
+  a dark green LED. "Red on, no green" was read as a boot failure twice; it is
+  perfectly normal for a healthy idle machine
+- **`EXT4 orphan cleanup` was self-inflicted.** It means the last shutdown was
+  unclean - which it was, because we kept pulling the power to test the card
+- **`get_throttled=0x0` was treated as inconclusive** and the official 5.1V/2.5A
+  supply was still suspected. It was fine all along
+- ⚠️ **The answer was in `exitscreen.log` from day one.** A line every five
+  minutes means every gap is an outage. Reconstructing that took one script and
+  would have ruled out the hardware immediately, instead of three wrong turns
+  reasoning from LEDs
 
-1. `@reboot` runs `run.py --wait-for-clock --force`
-2. On a boot that beats the wifi, `wait_for_clock()` times out after 180s
-3. Every feed then fails, and metro/weather caches are past their staleness limit
-   so they are correctly rejected rather than served stale
-4. **`--force` pushed that empty frame over a good one**, where it sat until the
-   next successful run
+**Rule:** on a Pi that seems dead, read the log and `dmesg` before touching the
+hardware. `tools/pi_doctor.py` now does all of it in one run.
 
-- [x] Fixed: `run.py` refuses to push when weather is None *and* there are no
-      departures - both dead means every feed failed. `--clear` is exempt, having
-      already whited the panel. `todo` is deliberately excluded from the test,
-      since an empty to-do list is legitimate
+- [ ] **S** If it still drops occasionally: the Pi is on the **5GHz** SSID
+      (`<my 5GHz network>`). 5GHz has shorter range and worse wall penetration, and
+      this fetches a few KB every five minutes - the 2.4GHz band would suit it
+      better
 
 ---
 
