@@ -204,7 +204,13 @@ def get_departures(limit: int = 2, force: bool = False) -> list[Departure] | Non
             raise ValueError(f"response has no {TPC}/Passes")
 
         if has_any_passes(payload):
-            cache.save(CACHE_KEY, payload)
+            try:
+                cache.save(CACHE_KEY, payload)
+            except Exception:
+                # A cache write failing must not throw away a good fetch. Without
+                # this it would fall through to the except below and serve stale
+                # data, despite holding fresh data in hand.
+                pass
             LAST_SOURCE = "fresh"
             return parse(payload, limit=limit)
 

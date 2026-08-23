@@ -160,8 +160,12 @@ def pick_for(day: date, index: list[dict] | None = None) -> dict | None:
     repeat, deterministically, without needing to remember what has been shown.
     A "seen" state file would be one more thing to lose or corrupt.
     """
+    # Read once, not once per work: this was re-opening and re-parsing the JSON
+    # for all ~120 candidates on every render, and left the loop able to see the
+    # blacklist change halfway through.
+    vetoed = blacklisted_ids()
     works = [w for w in (index if index is not None else get_index())
-             if w["id"] not in blacklisted_ids()]
+             if w["id"] not in vetoed]
     if not works:
         return None
 

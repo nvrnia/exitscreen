@@ -515,6 +515,53 @@ staleness constants.
 
 ---
 
+### Deep bug sweep 2026-08-23 — concurrency and collisions
+
+Beyond the metro work, a pass looking for races, shared state and things that
+only misbehave under load. Three real bugs.
+
+**1. Two writers shared one cache temp file.** `cache.save()` wrote to
+`{name}.tmp` - the same name for every process - then renamed it. Two writers on
+the same key would interleave into that one file and both rename it.
+
+- Demonstrated with 40 concurrent write pairs: on Windows it raises
+  `PermissionError`; **on Linux it does not raise at all** and produces spliced
+  JSON, which `load()` then silently discards as "no cache"
+- `run.py` takes a lock, but any tool run by hand - `preview.py --live` - can
+  land on top of the cron job, and both write the metro cache
+- [x] Fixed with `tempfile.mkstemp()` in the cache directory, so each writer gets
+      its own file and the rename stays atomic. Re-tested: **40/40 clean, nothing
+      spliced, no leftover temp files**
+
+**2. A failed cache write threw away a good fetch.** `cache.save()` sits inside
+`get_departures()`'s `try`, so a write failure fell through to the `except` and
+served *stale* data while holding *fresh* data in hand.
+
+- [x] The save is now wrapped on its own. A cache problem costs you the cache,
+      not the answer
+
+**3. The art blacklist was re-read once per candidate.** `pick_for()` called
+`blacklisted_ids()` inside a list comprehension, so the JSON file was opened and
+parsed **120 times per render** - and the loop could see the blacklist change
+halfway through.
+
+- [x] Hoisted out. One read. Selection verified unchanged: seven consecutive days
+      still give seven distinct works
+
+**Checked and clean:** no cache key collisions across the seven keys in use;
+`build_frame()` does not mutate the data passed to it; five renders of identical
+data give one digest; `metro.LAST_SOURCE` correctly tracks fresh → stale → fresh
+without leaking a wrong answer forward; corrupt, truncated and empty cache files
+all read as absent rather than crashing; all 13 tools run.
+
+- [ ] **S** `weather.py` and `todo.py` still cache a well-formed-but-junk 200 the
+      way metro used to, and neither reports its source. Same three-line fix
+- [ ] **S** `theme.Fonts()` is constructed on every `build_frame()`, loading ~14
+      variable-font instances per render. Works fine, but it is the obvious thing
+      to cache if a render ever feels slow on the Pi
+
+---
+
 ### Incident 2026-08-23 — the blank frame was the ghost-clear, not a crash
 
 The panel sat all day showing yesterday's art with an empty METRO and WEATHER.
