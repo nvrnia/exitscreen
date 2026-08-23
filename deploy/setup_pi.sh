@@ -84,10 +84,14 @@ if [ -f "$PROJECT/deploy/crontab" ]; then
     # fresh machine: with no crontab yet, `crontab -l` exits non-zero AND
     # `grep -v` finds nothing to print, which is also non-zero. Both are normal
     # here, so the pipeline is guarded rather than treated as failure.
-    existing="$(crontab -l 2>/dev/null | grep -v 'exitscreen/run.py' || true)"
-    printf '%s
-%s
-' "$existing" "$(cat "$PROJECT/deploy/crontab")" | crontab -
+    # deploy/crontab is the whole schedule, so install it outright. The old
+    # version tried to merge, filtering with `grep -v 'exitscreen/run.py'` -
+    # which never matched, because the lines read "cd .../exitscreen && ...
+    # run.py". Every run appended another duplicate copy.
+    #
+    # tr -d '\r' matters for a file that has been through a Windows checkout:
+    # a cron line ending in  is silently mangled.
+    tr -d '\r' < "$PROJECT/deploy/crontab" | crontab -
     echo "    installed from $PROJECT/deploy/crontab"
 else
     echo "    $PROJECT not deployed yet — copy the project across, then re-run"

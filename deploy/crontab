@@ -1,34 +1,45 @@
-# exitscreen schedule — install with:
-#   ( crontab -l 2>/dev/null | grep -v 'exitscreen/run.py' ; cat deploy/crontab ) | crontab -
-#
-# Every run fetches and renders; run.py pushes to the panel only when the
-# rendered image differs from the last one pushed. So a 5-minute cadence costs
-# almost nothing: on a quiet afternoon most runs end in "no change".
-#
-# Why 5 minutes rather than 10, when the metro feed is only polled every 10:
-# a delayed train changes the frame as soon as OVapi knows about it, rather than
-# waiting for a fixed cycle. The guard makes the extra runs free.
-
-# Render every 5 minutes from 06:00 to 21:55. It starts at 06:00 rather than
-# 07:00 so the panel is already current for a ~07:00 departure - by 06:50 it has
-# refreshed a dozen times, with no chance of being caught mid-gap.
-*/5 6-21 * * * cd /home/exitscreen/exitscreen && /home/exitscreen/venv/bin/python run.py >> /home/exitscreen/exitscreen.log 2>&1
-
-# One more at 22:00 to close the window, since */5 6-21 stops at 21:55.
-0 22 * * * cd /home/exitscreen/exitscreen && /home/exitscreen/venv/bin/python run.py >> /home/exitscreen/exitscreen.log 2>&1
-
-# 05:59 — daily ghost-clear, then an immediate forced redraw. Clearing leaves the
-# panel white, so --clear implies --force; otherwise the guard would see an
-# unchanged image, skip the push, and leave the display blank all day.
-#
-# Deliberately one minute before the render window opens: the clear blanks the
-# whole panel for a second or two, so it has to happen while nobody is looking.
-# It used to run at 06:59, which put that flash right in the way of a 07:00
-# departure - and made it the first render of the day rather than the last quiet
-# one of the night.
-59 5 * * * cd /home/exitscreen/exitscreen && /home/exitscreen/venv/bin/python run.py --clear >> /home/exitscreen/exitscreen.log 2>&1
-
-# After a reboot: wait for NTP before drawing. This Pi has no RTC, so at boot it
-# believes it is some time in the past — every departure would look "already
-# gone" and get filtered out, leaving an empty metro column.
-@reboot cd /home/exitscreen/exitscreen && /home/exitscreen/venv/bin/python run.py --wait-for-clock --force >> /home/exitscreen/exitscreen.log 2>&1
+# exitscreen schedule — install with:
+#   tr -d '\r' < deploy/crontab | crontab -
+#
+# This file IS the whole schedule, so it replaces the crontab outright rather
+# than trying to merge into it. The old recipe filtered existing lines with
+# `grep -v 'exitscreen/run.py'`, which never matched anything: the lines read
+# "cd .../exitscreen && ... python run.py", so the string "exitscreen/run.py"
+# never appears. Every install therefore appended another copy - there were four
+# by the time anyone looked.
+#
+# The `tr -d '\r'` is not optional for a file that has been through a Windows
+# checkout: a cron line ending in  is silently mangled. .gitattributes now
+# pins LF, but stripping it here costs nothing and cannot hurt.
+#
+# Every run fetches and renders; run.py pushes to the panel only when the
+# rendered image differs from the last one pushed. So a 5-minute cadence costs
+# almost nothing: on a quiet afternoon most runs end in "no change".
+#
+# Why 5 minutes rather than 10, when the metro feed is only polled every 10:
+# a delayed train changes the frame as soon as OVapi knows about it, rather than
+# waiting for a fixed cycle. The guard makes the extra runs free.
+
+# Render every 5 minutes from 06:00 to 21:55. It starts at 06:00 rather than
+# 07:00 so the panel is already current for a ~07:00 departure - by 06:50 it has
+# refreshed a dozen times, with no chance of being caught mid-gap.
+*/5 6-21 * * * cd /home/exitscreen/exitscreen && /home/exitscreen/venv/bin/python run.py >> /home/exitscreen/exitscreen.log 2>&1
+
+# One more at 22:00 to close the window, since */5 6-21 stops at 21:55.
+0 22 * * * cd /home/exitscreen/exitscreen && /home/exitscreen/venv/bin/python run.py >> /home/exitscreen/exitscreen.log 2>&1
+
+# 05:59 — daily ghost-clear, then an immediate forced redraw. Clearing leaves the
+# panel white, so --clear implies --force; otherwise the guard would see an
+# unchanged image, skip the push, and leave the display blank all day.
+#
+# Deliberately one minute before the render window opens: the clear blanks the
+# whole panel for a second or two, so it has to happen while nobody is looking.
+# It used to run at 06:59, which put that flash right in the way of a 07:00
+# departure - and made it the first render of the day rather than the last quiet
+# one of the night.
+59 5 * * * cd /home/exitscreen/exitscreen && /home/exitscreen/venv/bin/python run.py --clear >> /home/exitscreen/exitscreen.log 2>&1
+
+# After a reboot: wait for NTP before drawing. This Pi has no RTC, so at boot it
+# believes it is some time in the past — every departure would look "already
+# gone" and get filtered out, leaving an empty metro column.
+@reboot cd /home/exitscreen/exitscreen && /home/exitscreen/venv/bin/python run.py --wait-for-clock --force >> /home/exitscreen/exitscreen.log 2>&1

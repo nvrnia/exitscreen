@@ -1,0 +1,11 @@
+# Anything that ends up on the Pi must keep LF endings.
+#
+# Git converts LF to CRLF on Windows checkout by default. scp then copies those
+# CRLFs to Linux, where a crontab line ending in \r is silently mangled and a
+# shell script fails with "bad interpreter". That is exactly what happened on
+# 2026-08-23: every installed cron line ended in \r.
+* text=auto eol=lf
+
+*.png binary
+*.ttf binary
+*.pyc binary
