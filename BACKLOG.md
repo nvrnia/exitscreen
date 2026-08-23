@@ -515,6 +515,43 @@ staleness constants.
 
 ---
 
+### Why the wifi never recovered on its own — 2026-08-23
+
+The obvious question, asked and worth writing down: **why did it not just
+reconnect?** It sat unreachable from ~20:09 to at least 06:59 - eleven hours -
+and only came back when the power was pulled.
+
+**Because nothing knew it was disconnected.** The failure is not a clean drop.
+The Broadcom radio (`brcmfmac`) stays *nominally associated* while passing no
+traffic, so NetworkManager sees "connected, signal fine" and has no reason to
+retry. It is not refusing to reconnect; it does not believe anything is wrong.
+Power saving makes this far more likely, which is why disabling it mattered -
+but a marginal signal can produce the same state on its own. ~85% confident in
+the specific mechanism; certain about the symptom.
+
+Two gaps made it worse:
+- **Nothing runs between 22:00 and 06:00**, so even a midnight recovery would
+  not have drawn a frame until 06:59
+- **Nothing ever checked whether the network worked.** `run.py` notices its feeds
+  failed and simply shrugs
+
+- [x] `deploy/wifi_watchdog.sh` — pings the **router** every 5 minutes from
+      root's crontab, 24/7. On failure it bounces `wlan0`; after 6 consecutive
+      failures (~30 min) it reboots, which is what pulling the power was doing by
+      hand. Failure count lives in `/run` (tmpfs), so no SD card writes
+- Pings the gateway rather than the internet on purpose: a router that answers
+  while the uplink is down is a broken uplink, and bouncing our own wifi cannot
+  fix that. Pointless reconnects are their own risk
+- Tested with stubbed `ping`/`nmcli`/`reboot`: counts failures, clears on
+  recovery, reboots at the threshold, and treats a missing default route as a
+  failure
+
+- [ ] **S** Install it. Needs **root's** crontab, not the exitscreen user's:
+      `sudo cp deploy/wifi_watchdog.sh /usr/local/bin/ && sudo chmod +x ...`
+      then `sudo crontab -e` and add `*/5 * * * * /usr/local/bin/wifi_watchdog.sh`
+
+---
+
 ### Deep bug sweep 2026-08-23 — concurrency and collisions
 
 Beyond the metro work, a pass looking for races, shared state and things that
