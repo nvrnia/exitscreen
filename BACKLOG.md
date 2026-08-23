@@ -13,14 +13,38 @@ Size: **S** ≈ one sitting · **M** ≈ a session · **L** ≈ multiple session
 
 ## Where we are now
 
-*Last updated: 2026-07-30 — all four columns live, art included.*
+*Last updated: 2026-08-23 — a week of wifi debugging, all deployed.*
 
-> ✅ **On the wall and running.** First light 2026-07-27. The Pi renders every 5
-> minutes from cron and pushes only when the image changes. Everything planned for
-> v1 is built; what's left is living with it.
+> ✅ **On the wall and running.** First light 2026-07-27. Renders every 5 minutes
+> from 06:00 to 22:00 and pushes only when the image changes.
 
 | column | state |
 |---|---|
+| METRO | ✅ reachable departures only (6-min walk filter); says "feed unavailable" when it cannot reach OVapi |
+| WEATHER | ✅ the city conditions, umbrella rule, adaptive rain bars |
+| TODO | ✅ **today's tasks only**, with leave-by times on `#40m`-tagged ones |
+| ART | ✅ a Cleveland Museum painting a day, with veto |
+| PANEL | ✅ Pi 3A+ at <pi ip>, rounded 48px corners |
+
+**Schedule:** clear at 05:59, renders `*/5` 06:00–21:55, final render 22:00,
+`@reboot` waits for NTP. Moved an hour earlier for a ~07:00 departure.
+
+**The wifi week (22–23 Aug), in one line:** the Pi's wifi kept dying silently -
+the radio stayed nominally associated while passing nothing, so nothing ever
+triggered a reconnect. Diagnosed wrongly three times (SD card twice, power supply
+once) before `dmesg` and the log settled it. Now on 2.4GHz with power saving off
+and a watchdog that bounces the interface when the router stops answering.
+
+⚠️ **Signal is still only −70 dBm.** Everything above makes it fail *honestly* and
+recover *automatically*; none of it makes the link stronger. If
+`journalctl -t wifi-watchdog` shows it firing often, the answer is a repeater or
+a powerline adapter, not more code.
+
+**Deployed and installed on the Pi as of 2026-08-23:** all code, the 06:00
+crontab (clean - see the installer bug below), the wifi watchdog in root's cron,
+logrotate, and a persistent journal.
+
+---|---|
 | METRO | ✅ live — reachable the home stop departures only, 6-min walk filter |
 | WEATHER | ✅ live — the city conditions, umbrella rule, adaptive rain bars |
 | TODO | ✅ live — "our to do" list, with leave-by times on timed tasks |
