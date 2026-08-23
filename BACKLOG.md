@@ -477,6 +477,44 @@ Turning a script into an appliance.
       nothing is being written during normal operation. The log is diagnostic
       only and losing it on reboot costs nothing
 
+**Root cause of "0 departures when there were departures" — 2026-08-23.**
+
+Two separate holes, both able to produce it, and the log could not distinguish
+them because it recorded the *count* but never the *source*.
+
+**Hole 1: a bad API response was indistinguishable from a good one.** `fetch()`
+only raises on a network error or a non-200. OVapi is a free community server,
+and a 200 carrying an empty or wrong-shaped body sailed straight through - so it
+was treated as a good answer, **saved over a working cache**, and served for the
+next `MIN_POLL`. One glitched response became ten minutes of empty column.
+
+- [x] `carries_departures()` checks the response *shape*. A 200 without
+      `{TPC}/Passes` is now a failure, not an answer, and drops into the cache
+      fallback instead of overwriting it
+- [x] A well-formed response listing nothing is **never cached**, and falls back
+      to the last known data. That single branch is right in both situations
+      *because* `parse()` filters against the clock: at 21:10 the cached trains
+      are still upcoming and get shown; at 3am they have all gone, so it yields
+      `[]` by itself. No need to guess which case we are in
+- [x] Tested against five malformed payloads - empty Passes, missing Passes key,
+      empty object, wrong stop code, Passes as a list. None can poison the cache
+
+**Hole 2: the log hid where the data came from.** `metro : 2 departures` looked
+identical whether it was a live fetch or hour-old cached data being served with
+the wifi down. The whole 22 August outage had to be reasoned about backwards from
+staleness constants.
+
+- [x] `metro.LAST_SOURCE` records it and `run.py` logs it:
+      `fresh` · `cached` · `empty` · `empty, using last known` · `stale` ·
+      `unreachable`. So `2 departures (stale)` now says outright that the network
+      is down and you are looking at old data
+
+- [ ] **S** weather.py and todo.py have the same blind spot - a 200 with a junk
+      body would be cached the same way, and neither logs its source. Lower stakes
+      (weather holds 6 hours, to-do 24) but the same fix applies
+
+---
+
 ### Incident 2026-08-23 — the blank frame was the ghost-clear, not a crash
 
 The panel sat all day showing yesterday's art with an empty METRO and WEATHER.

@@ -116,8 +116,11 @@ def gather() -> FrameData:
         # None means unreachable; [] means the feed answered with nothing.
         data.metro_unavailable = departures is None
         data.departures = departures or []
+        # The source matters as much as the count: "2 departures (stale)" says
+        # the network is down and you are looking at old data, which "2
+        # departures" alone hides completely.
         log("metro   : feed unavailable" if departures is None
-            else f"metro   : {len(data.departures)} departures")
+            else f"metro   : {len(data.departures)} departures ({metro.LAST_SOURCE})")
     except Exception as exc:  # noqa: BLE001 - a dead feed must not stop the frame
         log(f"metro   : FAILED ({exc.__class__.__name__}: {exc})")
 
