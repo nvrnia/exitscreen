@@ -107,6 +107,10 @@ class FrameData:
     # guard can skip it. Rendering now() here would defeat the whole mechanism.
     fetched_at: datetime | None = None
     departures: list[Departure] = field(default_factory=list)
+    # True when the metro feed could not be reached at all, as opposed to
+    # answering with nothing. The column says so rather than showing a dash that
+    # reads as "no trains".
+    metro_unavailable: bool = False
     weather: Weather | None = None
     todos: list[Task] = field(default_factory=list)
     todo_total: int = 0  # for "+N more"; 0 means "same as len(todos)"

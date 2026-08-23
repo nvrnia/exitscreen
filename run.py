@@ -112,8 +112,12 @@ def gather() -> FrameData:
     try:
         from exitscreen import metro
 
-        data.departures = metro.get_departures(limit=2)
-        log(f"metro   : {len(data.departures)} departures")
+        departures = metro.get_departures(limit=2)
+        # None means unreachable; [] means the feed answered with nothing.
+        data.metro_unavailable = departures is None
+        data.departures = departures or []
+        log("metro   : feed unavailable" if departures is None
+            else f"metro   : {len(data.departures)} departures")
     except Exception as exc:  # noqa: BLE001 - a dead feed must not stop the frame
         log(f"metro   : FAILED ({exc.__class__.__name__}: {exc})")
 
@@ -206,7 +210,7 @@ def main() -> int:
     # opened, so declining here means it is never cleared in the first place and
     # yesterday's good frame stays up. A ghost-clear is cosmetic maintenance;
     # skipping it for a day costs nothing.
-    if data.weather is None and not data.departures:
+    if data.weather is None and (data.metro_unavailable or not data.departures):
         log("no live data - every feed failed. Panel left as it was")
         return 0
 

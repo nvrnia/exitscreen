@@ -243,7 +243,7 @@ def main():
         try:
             from exitscreen import metro
 
-            data.departures = metro.get_departures(limit=4)
+            data.departures = metro.get_departures(limit=4) or []
         except Exception:
             pass
     else:

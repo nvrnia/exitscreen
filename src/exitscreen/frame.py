@@ -128,7 +128,12 @@ def _draw_metro(d, f, data):
 
     if not data.departures:
         _text(d, x, T.HERO_BASE, MISSING, f.big)
-        _text(d, x, T.METRO_LINE_2, "no departures", f.meta, T.MUTED)
+        # "no departures" and "feed unavailable" are different facts. The first
+        # says stay in; the second says check your phone. Showing the former when
+        # we mean the latter is the more dangerous mistake on a door.
+        _text(d, x, T.METRO_LINE_2,
+              "feed unavailable" if data.metro_unavailable else "no departures",
+              f.meta, T.MUTED)
         return
 
     from . import metro as metro_module

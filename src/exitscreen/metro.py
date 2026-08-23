@@ -138,11 +138,19 @@ def fetch(tpc: str = TPC, timeout: float = 15) -> dict:
     return r.json()
 
 
-def get_departures(limit: int = 2, force: bool = False) -> list[Departure]:
-    """Upcoming departures, using the cache to stay polite and stay alive.
+def get_departures(limit: int = 2, force: bool = False) -> list[Departure] | None:
+    """Reachable departures, using the cache to stay polite and stay alive.
 
-    Returns an empty list only when there is no usable data at all, which the
-    frame renders as a dash rather than an error.
+    **None and [] mean different things**, and the difference is the point:
+
+        [...]  the feed answered; these are the trains you can catch
+        []     the feed answered and there is genuinely nothing reachable
+        None   we could not get data at all - unreachable, and the cache has
+               aged past MAX_STALE
+
+    They used to be conflated, so a dead OVapi rendered the same dash as a quiet
+    platform. On a door screen that reads as "no trains tonight" when it actually
+    means "I have no idea", which is the more dangerous of the two.
     """
     fresh = None if force else cache.load(CACHE_KEY, max_age=MIN_POLL)
     if fresh is not None:
@@ -159,4 +167,4 @@ def get_departures(limit: int = 2, force: bool = False) -> list[Departure]:
         stale = cache.load(CACHE_KEY, max_age=MAX_STALE)
         if stale is not None:
             return parse(stale, limit=limit)
-        return []
+        return None  # not "no trains" - "no idea". See the docstring.

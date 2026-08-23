@@ -523,11 +523,29 @@ is weak, not broken:
 **Still open, spotted in the same log.** At 21:10 metro went to `0 departures`
 and stayed there while weather kept working:
 
-- [ ] **M** `get_departures()` returns `[]` both when the feed is unreachable and
-      when there genuinely are no trains. The frame cannot tell them apart, so a
-      dead OVapi shows the same dash as a quiet night, and the guard - which only
-      blocks when metro *and* weather are both empty - lets a half-empty frame
-      through. Worth returning a "feed failed" signal so the panel can say so
+- [x] **Fixed 2026-08-23.** `get_departures()` returned `[]` both when the feed
+      was unreachable and when there genuinely were no trains, so a dead OVapi
+      rendered the same dash as a quiet platform - reading as "no trains tonight"
+      when it meant "no idea". It now returns **`None`** for unreachable and keeps
+      `[]` for genuinely nothing. `FrameData.metro_unavailable` carries the
+      distinction, the column says **"feed unavailable"**, and the blank-frame
+      guard keys off the flag rather than inferring from emptiness
+
+**The timing of 22 August, explained by the three staleness windows.** Each feed
+serves its last good data until its own limit expires, so one network failure
+blanks them at different times:
+
+| feed | serves stale for | went blank |
+|---|---|---|
+| metro | 1 hour | 21:10 |
+| weather | 6 hours | ~02:10, unseen - window closed at 22:00 |
+| to-do | 24 hours | never got there |
+
+Working back from metro blanking at 21:10, **the wifi died at about 20:10**. The
+staggered failure was not a bug; it is the different `MAX_STALE` values doing
+exactly what they were written to do. Left as they are: an OVapi payload only
+reaches ~85 minutes ahead, so a metro window longer than an hour would have no
+future departures left to show anyway.
 - [ ] **S** Persistent journal is now genuinely working (`systemd-tmpfiles
       --create` was the missing step; `mkdir` alone is not enough). The next
       death will finally have a `journalctl -b -1` to read

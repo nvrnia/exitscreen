@@ -40,12 +40,14 @@ def build_data(live: bool = False):
     from exitscreen import metro, weather
 
     departures = metro.get_departures(limit=2)
-    data.departures = departures
-    print(
-        f"  metro:   {len(departures)} live departures"
-        if departures
-        else "  metro:   no data (renders as a dash)"
-    )
+    data.metro_unavailable = departures is None
+    data.departures = departures or []
+    if departures is None:
+        print("  metro:   feed unavailable (renders as 'feed unavailable')")
+    elif departures:
+        print(f"  metro:   {len(departures)} live departures")
+    else:
+        print("  metro:   no reachable departures (renders as a dash)")
 
     conditions = weather.get_weather()
     data.weather = conditions
