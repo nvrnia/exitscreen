@@ -477,6 +477,63 @@ Turning a script into an appliance.
       nothing is being written during normal operation. The log is diagnostic
       only and losing it on reboot costs nothing
 
+### Incident 2026-08-23 — the blank frame was the ghost-clear, not a crash
+
+The panel sat all day showing yesterday's art with an empty METRO and WEATHER.
+Nothing had crashed. The log says exactly what happened:
+
+```
+2026-08-23 06:59:02  metro   : 0 departures
+2026-08-23 06:59:02  weather : no data
+2026-08-23 06:59:05  cleared in 0.7s
+```
+
+The daily ghost-clear ran while both feeds were dead. The blank-frame guard had
+an explicit `--clear` exemption, so it whited the panel and drew an empty frame,
+and that frame stayed up all day.
+
+**The reasoning behind the exemption was wrong.** It was: "`--clear` has already
+whited the panel, so it must draw *something* or the display is left blank."
+But the guard runs **before the panel is even opened** - declining there means it
+is never cleared in the first place, and the previous good frame simply stays.
+
+- [x] Guard now applies to `--clear` too. Verified across five paths: dead feeds
+      with no flag, with `--force`, and with `--clear` all touch nothing; live
+      feeds still clear and push normally
+- A ghost-clear is cosmetic maintenance. Skipping it on a day the feeds are down
+  costs nothing; blanking the door does not
+
+**Also found, and this is the underlying cause of the whole week.** The wifi link
+is weak, not broken:
+
+```
+5GHz  <my 5GHz network>   signal -77 dBm   tx 12.0 Mbit/s
+2.4GHz <my network>     signal -70 dBm   tx 28.8 Mbit/s
+```
+
+- [x] Moved to the 2.4GHz SSID. 5GHz has worse range and wall penetration, and
+      this fetches a few KB every five minutes - the trade was backwards
+- ⚠️ **-70 dBm is still only "fair".** Both bands scan at ~48-50 from the Pi's
+      position, so the real problem is distance from the router, not the band. If
+      it keeps dropping, no configuration will fix it - that is a repeater, a
+      powerline adapter, or moving the router
+- [x] Wifi power saving stays disabled and survived a reboot; that fix was real
+      but was never the whole story
+
+**Still open, spotted in the same log.** At 21:10 metro went to `0 departures`
+and stayed there while weather kept working:
+
+- [ ] **M** `get_departures()` returns `[]` both when the feed is unreachable and
+      when there genuinely are no trains. The frame cannot tell them apart, so a
+      dead OVapi shows the same dash as a quiet night, and the guard - which only
+      blocks when metro *and* weather are both empty - lets a half-empty frame
+      through. Worth returning a "feed failed" signal so the panel can say so
+- [ ] **S** Persistent journal is now genuinely working (`systemd-tmpfiles
+      --create` was the missing step; `mkdir` alone is not enough). The next
+      death will finally have a `journalctl -b -1` to read
+
+---
+
 ### Incident 2026-08-21 — SOLVED: wifi power saving. Never the hardware
 
 The panel kept freezing and the Pi kept becoming unreachable. Diagnosed wrong

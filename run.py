@@ -193,14 +193,20 @@ def main() -> int:
     #
     # If metro AND weather both came back with nothing, every feed failed - the
     # caches have a staleness limit and stop serving old data past it. In
-    # practice that means a boot that beat the wifi: @reboot runs with --force,
-    # so without this guard it would push a blank frame over a perfectly good
-    # one, and that blank would sit on the door until the next successful run.
-    # A stale frame is far better than an empty one.
+    # practice that means the wifi is down: @reboot runs with --force, so without
+    # this guard it would push a blank frame over a perfectly good one, and that
+    # blank would sit on the door until the next successful run. A stale frame is
+    # far better than an empty one.
     #
-    # --clear is exempt: it has already whited the panel, so it must draw
-    # something or the display is left blank, which is worse.
-    if data.weather is None and not data.departures and not args.clear:
+    # This applies to --clear too, and that is the whole point. The 06:59
+    # ghost-clear once ran with both feeds dead: it whited the panel and drew an
+    # empty frame, which then sat on the door all day. The clear used to be
+    # exempt on the reasoning that it had already blanked the display so it had
+    # to draw *something* - but this check happens before the panel is even
+    # opened, so declining here means it is never cleared in the first place and
+    # yesterday's good frame stays up. A ghost-clear is cosmetic maintenance;
+    # skipping it for a day costs nothing.
+    if data.weather is None and not data.departures:
         log("no live data - every feed failed. Panel left as it was")
         return 0
 
