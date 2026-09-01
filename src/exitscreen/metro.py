@@ -71,11 +71,16 @@ LAST_SOURCE = "unknown"
 WALK_TO_PLATFORM_MIN = 6
 
 
-# Destinations as OVapi gives them are too long to show twice in one column.
-# "CS" is how Dutch signage abbreviates Centraal Station, so it reads naturally.
+# Destinations as OVapi gives them are too long for this column.
+#
+# The "CS" suffix went too: the first departure's route is drawn *beside* the
+# 70px time, which leaves ~180px, and "E -> the terminus" measured 187 - seven
+# pixels over, so it truncated to "the city...". Every northbound service from
+# this platform terminates at a Centraal station, so the suffix carried no
+# information anyway, and dropping it beats having two abbreviations for one place.
 SHORTEN = {
-    "the interchange": "the terminus",
-    "the far terminus": "Den Haag CS",
+    "the interchange": "the city",
+    "the far terminus": "Den Haag",
     "the city Slinge": "Slinge",
 }
 

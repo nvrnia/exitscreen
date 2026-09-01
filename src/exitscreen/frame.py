@@ -26,6 +26,7 @@ MISSING = "–"  # en dash, shown when a feed is down
 
 # Column headings, in one place so they stay consistent
 LABEL_METRO = "METRO"
+LABEL_COMMUTE = "TO UNI"
 LABEL_WEATHER = "WEATHER"
 LABEL_TODO = "TO DO"
 
@@ -40,6 +41,22 @@ def _fit(draw, text: str, font, max_width: float) -> str:
         return text
     ellipsis = "…"
     while text and draw.textlength(text + ellipsis, font=font) > max_width:
+        text = text[:-1]
+    return text.rstrip() + ellipsis
+
+
+def _fit_tracked(draw, text: str, font, tracking: float, max_width: float) -> str:
+    """_fit, but for text that will be drawn letter-spaced.
+
+    _fit measures with textlength(), which knows nothing about tracking. The
+    caption is drawn with draw_tracked_right() at 1.2px per character, so over a
+    long artist-and-title that is ~70px of width nobody accounted for - which is
+    exactly how the caption ended up printed over the date.
+    """
+    if T.tracked_width(draw, text, font, tracking) <= max_width:
+        return text
+    ellipsis = "…"
+    while text and T.tracked_width(draw, text + ellipsis, font, tracking) > max_width:
         text = text[:-1]
     return text.rstrip() + ellipsis
 
@@ -116,13 +133,15 @@ def _draw_caption_topbar(d, f, data):
     date_width = T.tracked_width(d, _date_label(data.day), f.topbar,
                                  T.TOPBAR_TRACKING)
     available = T.CONTENT_RIGHT - (T.MARGIN_X + date_width + 40)
-    text = _fit(d, data.artwork.label.upper(), f.caption, available)
+    text = _fit_tracked(d, data.artwork.label.upper(), f.caption,
+                        T.CAPTION_TRACKING, available)
     T.draw_tracked_right(d, T.CONTENT_RIGHT, T.TOPBAR_BASE, text, f.caption,
                          T.CAPTION_TRACKING, T.MUTED)
 
 
-def _draw_metro(d, f, data):
-    x, right = T.column(0)
+def _draw_metro(d, f, data, x=None, right=None):
+    if x is None:
+        x, right = T.column(0)
 
     T.draw_tracked(d, (x, T.LABEL_BASE), LABEL_METRO, f.label, T.LABEL_TRACKING, T.FURNITURE_INK)
 
@@ -141,9 +160,9 @@ def _draw_metro(d, f, data):
     first = data.departures[0]
     _text(d, x, T.HERO_BASE, first.clock, f.big)
 
-    def route(baseline, departure, prefix=""):
+    def route(baseline, departure, start_x, prefix=""):
         """line + arrow + destination on one line, optionally time-prefixed."""
-        cursor = x
+        cursor = start_x
         if prefix:
             _text(d, cursor, baseline, prefix, f.meta, T.MUTED)
             cursor += d.textlength(prefix, font=f.meta)
@@ -155,17 +174,30 @@ def _draw_metro(d, f, data):
         _text(d, cursor, baseline, _fit(d, name, f.meta, right - cursor), f.meta,
               T.MUTED)
 
-    # Both departures carry their own line and destination: D and E alternate at
-    # this platform and go to different cities, so a bare "then 15:31" cannot be
-    # acted on - you would not know whether it is the one you want.
-    route(T.METRO_LINE_1, first)
+    # The first departure's route sits BESIDE the big time rather than under it.
+    # Both share the hero baseline, which is what makes a 70px numeral and a 21px
+    # line look deliberately set rather than accidentally adjacent - and it frees
+    # a whole line lower down for the commute.
+    route(T.HERO_BASE, first, x + d.textlength(first.clock, font=f.big) + 18)
+
+    # Both departures carry their own destination: D and E alternate here and go
+    # to different cities, so a bare "then 15:31" cannot be acted on.
     if len(data.departures) > 1:
-        route(T.METRO_LINE_2, data.departures[1],
+        route(T.METRO_LINE_1, data.departures[1], x,
               prefix=f"{data.departures[1].clock}   ")
 
+    # The commute takes the line the second departure used to occupy.
+    if data.commute is not None:
+        c = data.commute
+        metro_at = c.metro_departs or c.metro_deadline
+        _text(d, x, T.METRO_LINE_2,
+              _fit(d, f"metro {metro_at} · bus {c.bus_departs}", f.meta, right - x),
+              f.meta, T.MUTED)
 
-def _draw_weather(d, f, data):
-    x, right = T.column(1)
+
+def _draw_weather(d, f, data, x=None, right=None):
+    if x is None:
+        x, right = T.column(1)
     w = data.weather
 
     T.draw_tracked(d, (x, T.LABEL_BASE), LABEL_WEATHER, f.label, T.LABEL_TRACKING, T.FURNITURE_INK)
@@ -241,8 +273,9 @@ def _draw_rain_bars(d, x, y, hours, bar_w=13, gap=5):
         d.rectangle([bx, y + T.BARS_H - h, bx + bar_w, y + T.BARS_H], fill=fill)
 
 
-def _draw_todo(img, d, f, data):
-    x, right = T.column(2)
+def _draw_todo(img, d, f, data, x=None, right=None):
+    if x is None:
+        x, right = T.column(2)
 
     T.draw_tracked(d, (x, T.LABEL_BASE), LABEL_TODO, f.label, T.LABEL_TRACKING, T.FURNITURE_INK)
 
@@ -370,12 +403,16 @@ def build_frame(
     _draw_topbar(d, f, data)
     _draw_caption_topbar(d, f, data)
 
+    edges = T.columns(False)
+
     # rules above the decision row and above the footer
     for y in (T.DECISION_TOP, T.FOOTER_TOP):
         d.line([(T.CONTENT_LEFT, y), (T.CONTENT_RIGHT, y)], fill=T.DIVIDER, width=1)
 
-    # column dividers, inset from the rules so they do not form hard corners
-    for x in T.COL_EDGES[1:-1]:
+    # Column dividers, inset from the rules so they do not form hard corners.
+    # Driven by `edges`, not COL_EDGES, or a four-column day would draw its
+    # dividers in the three-column positions.
+    for x in edges[1:-1]:
         d.line(
             [(x, T.DECISION_TOP + 16), (x, T.FOOTER_TOP - 16)],
             fill=T.DIVIDER,

@@ -121,6 +121,12 @@ HERO_BASE = ROW_TOP + 90  # 647  the clock and the temperature share this
 METRO_LINE_1 = ROW_TOP + 131  # 688  "then 14:41"
 METRO_LINE_2 = ROW_TOP + 169  # 726  "D -> the interchange"
 
+# commute: two lines, sitting where the metro column's hero and first line are so
+# the three columns still share a rhythm.
+COMMUTE_LINE_1 = ROW_TOP + 62
+COMMUTE_LINE_2 = ROW_TOP + 100
+COMMUTE_TIME_X = 62   # where the time starts, so both times align in a column
+
 # weather: bar chart, then two lines. Bars must clear the temperature's
 # descenders, which is why the first text line sits lower than metro's.
 # The weather icon sits in the same place at the same size whether or not it is
@@ -208,21 +214,20 @@ ART_FLAT_THRESHOLD = 45
 # nameplate below it, and the last column ends flush at CONTENT_RIGHT. Padding
 # applies only where two columns meet.
 
-# Where the class commute goes when there is one:
-#   "metro_column"  the bus shares the METRO column, using the two lines that
-#                   currently hold a second departure. No layout change at all.
-#   "own_column"    a fourth column headed BUS, with the width taken from
-#                   TO DO.
-# Only affects days with a class; a free day always renders the plain layout.
-COMMUTE_STYLE = "metro_column"
+# On a class day the commute gets its own narrow column, and METRO keeps both of
+# its departures untouched. Folding the bus into the METRO column was tried and
+# rejected: it displaced the second departure, which is still wanted.
+#
+# The column is deliberately the narrowest - it holds two short lines and nothing
+# else - so the width comes mostly from TO DO, which degrades by showing fewer
+# tasks rather than by truncating anything.
 
 # Derived rather than hardcoded, so changing FRAME_PAD (which the corner radius
 # forces) reflows the columns instead of needing them recalculated by hand.
 COL_RATIOS = (1.1, 1.0, 1.2)
 
-# Four columns when the bus gets its own. TO DO gives up the most, since it is
-# the widest and degrades most gracefully - it just shows fewer tasks.
-COL_RATIOS_WITH_BUS = (1.0, 0.85, 0.95, 1.05)
+# Four columns on a class day: METRO, TO UNI, WEATHER, TO DO.
+COL_RATIOS_WITH_BUS = (1.05, 0.62, 0.95, 1.08)
 
 
 def _col_edges(ratios=None) -> tuple[int, ...]:
