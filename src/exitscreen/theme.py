@@ -208,22 +208,51 @@ ART_FLAT_THRESHOLD = 45
 # nameplate below it, and the last column ends flush at CONTENT_RIGHT. Padding
 # applies only where two columns meet.
 
+# Where the class commute goes when there is one:
+#   "metro_column"  the bus shares the METRO column, using the two lines that
+#                   currently hold a second departure. No layout change at all.
+#   "own_column"    a fourth column headed BUS, with the width taken from
+#                   TO DO.
+# Only affects days with a class; a free day always renders the plain layout.
+COMMUTE_STYLE = "metro_column"
+
 # Derived rather than hardcoded, so changing FRAME_PAD (which the corner radius
 # forces) reflows the columns instead of needing them recalculated by hand.
 COL_RATIOS = (1.1, 1.0, 1.2)
 
+# Four columns when the bus gets its own. TO DO gives up the most, since it is
+# the widest and degrades most gracefully - it just shows fewer tasks.
+COL_RATIOS_WITH_BUS = (1.0, 0.85, 0.95, 1.05)
 
-def _col_edges() -> tuple[int, ...]:
+
+def _col_edges(ratios=None) -> tuple[int, ...]:
+    ratios = ratios or COL_RATIOS
     span = CONTENT_RIGHT - CONTENT_LEFT
-    scale = span / sum(COL_RATIOS)
+    scale = span / sum(ratios)
     edges = [CONTENT_LEFT]
-    for ratio in COL_RATIOS[:-1]:
+    for ratio in ratios[:-1]:
         edges.append(round(edges[-1] + ratio * scale))
     edges.append(CONTENT_RIGHT)
     return tuple(edges)
 
 
 COL_EDGES = _col_edges()
+
+
+def columns(with_bus: bool) -> tuple[int, ...]:
+    """Column edges for the layout actually being drawn."""
+    return _col_edges(COL_RATIOS_WITH_BUS if with_bus else COL_RATIOS)
+
+
+def column_at(edges: tuple[int, ...], index: int) -> tuple[int, int]:
+    """Left and right x for one column of a given edge set.
+
+    Same rule as column(): the outer columns carry no inner padding, so the
+    first starts flush at CONTENT_LEFT and the last ends flush at CONTENT_RIGHT.
+    """
+    left = edges[index] + (0 if index == 0 else COL_GUTTER)
+    right = edges[index + 1] - (0 if index == len(edges) - 2 else COL_GUTTER)
+    return left, right
 COL_GUTTER = 22
 
 

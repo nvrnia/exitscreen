@@ -108,14 +108,19 @@ def freshest_fetch() -> datetime:
 def gather() -> FrameData:
     """Collect every block, tolerating individual failures."""
     data = FrameData(day=date.today())
+    all_departures: list = []
 
     try:
         from exitscreen import metro
 
-        departures = metro.get_departures(limit=2)
+        # Ask for more than the two we display: commute.py needs to find the
+        # departure nearest its deadline, which can be an hour out. Same single
+        # fetch either way - the limit only slices an already-parsed payload.
+        departures = metro.get_departures(limit=20)
         # None means unreachable; [] means the feed answered with nothing.
         data.metro_unavailable = departures is None
-        data.departures = departures or []
+        all_departures = departures or []
+        data.departures = all_departures[:2]
         # The source matters as much as the count: "2 departures (stale)" says
         # the network is down and you are looking at old data, which "2
         # departures" alone hides completely.
@@ -142,6 +147,21 @@ def gather() -> FrameData:
             + (f" | {', '.join(timed)}" if timed else ""))
     except Exception as exc:  # noqa: BLE001
         log(f"todo    : FAILED ({exc.__class__.__name__}: {exc})")
+
+    try:
+        from exitscreen import commute
+
+        data.commute = commute.plan(data.day, datetime.now(), all_departures)
+        if data.commute:
+            c = data.commute
+            log(f"commute : class {c.class_start} | metro "
+                + (f"{c.metro_departs}" if c.metro_departs else f"by {c.metro_deadline}")
+                + f" | bus {c.bus_departs} -> the university stop {c.bus_arrives}")
+        elif commute.expired(data.day):
+            log("commute : bus timetable has EXPIRED - rerun "
+                "tools/build_bus_timetable.py")
+    except Exception as exc:  # noqa: BLE001
+        log(f"commute : FAILED ({exc.__class__.__name__}: {exc})")
 
     # Set last: the caches have now been written, so this reflects this run's
     # data rather than the previous one's.

@@ -111,6 +111,9 @@ class FrameData:
     # answering with nothing. The column says so rather than showing a dash that
     # reads as "no trains".
     metro_unavailable: bool = False
+    # Today's journey to class, or None on a free day / outside term. Built in
+    # commute.py so frame.py stays a renderer.
+    commute: object | None = None
     weather: Weather | None = None
     todos: list[Task] = field(default_factory=list)
     todo_total: int = 0  # for "+N more"; 0 means "same as len(todos)"
