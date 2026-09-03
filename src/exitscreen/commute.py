@@ -65,9 +65,9 @@ class Commute:
     """One planned journey. Times are strings because the frame only draws them."""
 
     class_start: str            # "14:00"
-    arrive_by: str              # "11:45" - class minus the early margin
-    bus_departs: str            # "11:03" from the interchange
-    bus_arrives: str            # "11:32" at the university stop
+    arrive_by: str              # "13:30" - class minus the early margin
+    bus_departs: str            # "12:48" from the interchange
+    bus_arrives: str            # "13:17" at the university stop
     metro_deadline: str         # last moment a metro can leave the home stop
     metro_departs: str | None    # a real departure at/before that, when known
     metro_line: str | None
