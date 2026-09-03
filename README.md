@@ -6,6 +6,10 @@ on the shared to-do list, and a painting.
 
 ![the panel](docs/panel.png)
 
+<sub>Sample data, not my actual feed — real departures and a real to-do
+list say more about where someone lives than a demo image needs to.
+Regenerate with `py tools/readme_image.py`.</sub>
+
 It refreshes every five minutes but only redraws when something's actually
 changed. E-ink holds its image with the power off, so most of the time it just
 sits there costing nothing.
@@ -101,7 +105,8 @@ src/exitscreen/
   icons.py     weather glyphs from a bundled font; arrows drawn by hand
   eink.py      256 greys down to 16, and the frame hash
   display.py   the only file that imports the panel driver
-tools/         previewers, a spacing auditor, art veto, a Pi doctor
+tools/         previewers, a spacing auditor, art veto, a Pi doctor,
+               and the thing that renders the image above
 deploy/        crontab, wifi watchdog, and a one-command Pi rebuild script
 ```
 
