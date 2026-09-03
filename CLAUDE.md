@@ -4,8 +4,8 @@ Read this first, and follow it for every response in this project.
 
 ## About the project
 Building **exitscreen** — a DIY e-ink display for my front door that shows what I
-need before leaving: the city metro times, weather, TickTick todos, and a daily
-AI-generated B&W art panel. Full technical spec is in **exitscreen-spec.md** —
+need before leaving: metro times, weather, TickTick todos, and a public-domain
+painting of the day rendered in greys. Full technical spec is in **exitscreen-spec.md** —
 treat that as the source of truth for what to build. This file is about *how* to
 work with me.
 

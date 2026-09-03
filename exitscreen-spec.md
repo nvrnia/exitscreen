@@ -44,11 +44,11 @@ Keep the strip thin so the art gets maximum room, but the metro number stays lar
 
 ## Block 1 — METRO 🔶 in progress
 
-**Location:** user boards at **the home stop** (the city, underground metro station, lines **D** and **E**).
+**Location:** user boards at **the home stop** - an underground metro station served by two lines.
 Typical destinations: **the interchange** and **the far terminus** (both served by line E; D also runs through here).
 
 ### Data source ✅ decided: OVapi (`v0.ovapi.nl`)
-- Free, community-run public API fed by NDOV Loket. Covers all Dutch operators incl. **the operator** (the city).
+- Free, community-run public API fed by NDOV Loket. Covers all Dutch operators, including my local one.
 - **No API key, no OAuth** — just HTTP GET a URL and parse JSON. (Big win vs TickTick's OAuth.)
 - Two endpoint styles:
   - `https://v0.ovapi.nl/tpc/<TPC>` — a single **TimingPointCode** = one platform/quay (one direction).
@@ -92,16 +92,16 @@ Typical destinations: **the interchange** and **the far terminus** (both served 
 
 ## Block 2 — WEATHER ✅ decided
 
-**Location:** the city, approx **lat 0.00, lon 0.00** (fine-tune to the apartment if wanted).
+**Location:** set `weather.lat` / `weather.lon` in `assets/settings.json`. Two decimal places is plenty - it is a weather forecast, not a survey, and more precision only pins down where you live.
 
 ### Data source ✅ decided: Open-Meteo (`api.open-meteo.com`)
 - Free, **no API key, no signup, no meaningful rate limits** (10k calls/day free tier — we use a handful).
-- Blends national weather models incl. **KNMI** (Dutch met office) → accurate over the city.
+- Blends national weather models incl. **KNMI** (Dutch met office) → accurate over the Netherlands.
 - One GET returns everything, clean JSON, arrays index-aligned with their `time` array.
 
 ### Endpoint (one call covers the whole block)
 ```
-https://api.open-meteo.com/v1/forecast?latitude=0.00&longitude=0.00&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m&hourly=precipitation_probability,temperature_2m&timezone=auto
+https://api.open-meteo.com/v1/forecast?latitude=<lat>&longitude=<lon>&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m&hourly=precipitation_probability,temperature_2m&timezone=auto
 ```
 - `current.temperature_2m` → the big number, e.g. `7°`
 - `current.wind_speed_10m` (km/h) + `current.wind_direction_10m` → wind, e.g. `↑18`
@@ -110,7 +110,7 @@ https://api.open-meteo.com/v1/forecast?latitude=0.00&longitude=0.00&current=temp
 
 ### Implementation notes
 - Poll every ~15–30 min; cache last good response; on failure show last good data.
-- `timezone=auto` so the hourly `time` array is in local the city time (helps the "rain at 4pm" logic).
+- `timezone=auto` so the hourly `time` array is in local time (helps the "rain at 4pm" logic).
 - Units default to metric/°C/km-h for a European location — confirm in the response; can force with `&wind_speed_unit=kmh&temperature_unit=celsius`.
 - The **"bring this"** rules (Logic epic) consume this data: high upcoming precip prob → umbrella icon; low temp → jacket; high wind → wind icon. Design the icon set as part of the art/render style (cross-hatch B&W to match).
 
@@ -151,7 +151,7 @@ The soul of the display: one AI-generated B&W illustration per day, driven by th
 ### ART BIBLE (visual identity — keep every day consistent as one series)
 - **Technique:** delicate **linework with cross-hatch shading** (etching / fine-line engraving feel). Outlines delicate; shadow/depth built from hatching, not solid black fills. Calm and sincere, **not** whimsical/cartoony.
 - **Subject:** quiet, **unpeopled** scenes of **place and nature**. One clear focal subject (a bridge, a window, a tree, water, sky) grounded in a **modest amount of setting/detail** — not stark-empty, not busy.
-- **Setting flavor:** loosely **NL-adjacent** — canals, low bridges, rooftops, flat wide skies, water — but **not touristy/landmark the city**. Just gently Dutch-feeling. Generic cozy/nature scenes are fine too.
+- **Setting flavor:** loosely **NL-adjacent** — canals, low bridges, rooftops, flat wide skies, water — but **not touristy/landmark**. Just gently Dutch-feeling. Generic cozy/nature scenes are fine too.
 - **Tone:** **varies with the day's mood.** Clear day → light, airy, lots of white. Grey/rainy day → darker, denser hatching, atmospheric. The *technique stays constant*; the *tonal weight flexes*.
 - **No people. No text baked into the image** (the date caption is added separately by the render layer).
 

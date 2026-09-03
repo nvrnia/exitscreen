@@ -60,7 +60,7 @@ MAX_STALE = 6 * 3600
 
 # Upper bound in km/h for forces 1..11; anything above is force 12. Verified
 # against published tables rather than recalled - sources differ by +/-1 at the
-# 117/118 boundary, which is immaterial at the city wind speeds.
+# 117/118 boundary, which is immaterial at the wind speeds seen here.
 _BEAUFORT_UPPER = (5, 11, 19, 28, 38, 49, 61, 74, 88, 102, 117)
 
 

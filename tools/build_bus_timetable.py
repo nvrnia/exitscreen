@@ -5,7 +5,7 @@
 Writes assets/timetable.json.
 
 Why a file rather than a live API: OVapi's live endpoints only accept numeric
-the operator timing-point codes, and the bus stops we need are not reachable that way -
+metro timing-point codes, and the bus stops we need are not reachable that way -
 /stopareacode/, /tpc/ with an alphabetic code, and /line/ detail all return empty
 objects. See BACKLOG. The GTFS feed has the whole timetable, so we take it once.
 

@@ -21,7 +21,7 @@ Size: **S** ≈ one sitting · **M** ≈ a session · **L** ≈ multiple session
 | column | state |
 |---|---|
 | METRO | ✅ reachable departures only (6-min walk filter); says "feed unavailable" when it cannot reach OVapi |
-| WEATHER | ✅ the city conditions, umbrella rule, adaptive rain bars |
+| WEATHER | ✅ local conditions, umbrella rule, adaptive rain bars |
 | TODO | ✅ **today's tasks only**, with leave-by times on `#40m`-tagged ones |
 | ART | ✅ a Cleveland Museum painting a day, with veto |
 | PANEL | ✅ Pi 3A+ at <your Pi's IP>, rounded 48px corners |
@@ -46,7 +46,7 @@ logrotate, and a persistent journal.
 
 ---|---|
 | METRO | ✅ live — reachable the home stop departures only, 6-min walk filter |
-| WEATHER | ✅ live — the city conditions, umbrella rule, adaptive rain bars |
+| WEATHER | ✅ live — local conditions, umbrella rule, adaptive rain bars |
 | TODO | ✅ live — "our to do" list, with leave-by times on timed tasks |
 | ART | ✅ live — a Cleveland Museum painting a day, with veto |
 | PANEL | ✅ live — Pi 3A+ on `exitscreen-pi.local`, cron every 5 min |
@@ -206,7 +206,7 @@ revisit only if it actually causes a missed train.
 **Still open:**
 - [ ] **S** ⚠️ Check what the feed does late at night / during engineering works
       (does `Passes` go empty?) — the no-departures path is written but untested
-- [ ] **S** Consider shortening `the terminus` → `Centraal` if the column gets tight
+- [ ] **S** Consider shortening the terminus label if the column gets tight
 - [ ] **S** Verify the numbers against the actual platform sign in person
 
 ~~Decide how to render an imminent train (`0'` vs `now`)~~ — **moot.** Absolute
@@ -926,7 +926,7 @@ to 16 greys wastes most of the levels.
 Checked rather than inherited from the spec.
 
 **Metro — OVapi stays.** Confirmed as the standard source for Dutch realtime
-departures across all operators including the operator. The alternatives are worse here:
+departures across all operators including my local one. The alternatives are worse here:
 NDOV Loket is the raw upstream feed and needs materially more work; the NS API is
 trains only, no metro. The known warts (plain HTTP because of the broken
 certificate, community server, poll gently) are the cost of the category.

@@ -74,7 +74,7 @@ WALK_TO_PLATFORM_MIN = settings.get("metro", "walk_to_platform_min", 6)
 # Destinations as the feed gives them are too long for this column.
 #
 # The first departure's route is drawn *beside* the 70px time, which leaves about
-# 180px - so a long terminus name truncated to "the city...". The mapping is
+# 180px - so a long terminus name truncated mid-word. The mapping is
 # personal (it depends which lines serve your platform), so it comes from
 # settings rather than being hardcoded here.
 SHORTEN = settings.get("metro", "shorten", {})

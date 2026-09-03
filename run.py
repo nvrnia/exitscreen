@@ -149,14 +149,15 @@ def gather() -> FrameData:
         log(f"todo    : FAILED ({exc.__class__.__name__}: {exc})")
 
     try:
-        from exitscreen import commute
+        from exitscreen import commute, settings
 
         data.commute = commute.plan(data.day, datetime.now(), all_departures)
         if data.commute:
             c = data.commute
             log(f"commute : class {c.class_start} | metro "
                 + (f"{c.metro_departs}" if c.metro_departs else f"by {c.metro_deadline}")
-                + f" | bus {c.bus_departs} -> the university stop {c.bus_arrives}")
+                + f" | bus {c.bus_departs} -> {c.bus_arrives}"
+                + f" {settings.get('commute', 'destination', '')}".rstrip())
         elif commute.expired(data.day):
             log("commute : bus timetable has EXPIRED - rerun "
                 "tools/build_bus_timetable.py")
