@@ -107,7 +107,8 @@ src/exitscreen/
   display.py   the only file that imports the panel driver
 tools/         previewers, a spacing auditor, art veto, a Pi doctor,
                and the thing that renders the image above
-deploy/        crontab, wifi watchdog, and a one-command Pi rebuild script
+deploy/        crontab, wifi watchdog, a one-command Pi rebuild script,
+               and push.sh, which deploys the working tree to the Pi
 ```
 
 `BACKLOG.md` is the running log: what's left, what broke, and why a few things
