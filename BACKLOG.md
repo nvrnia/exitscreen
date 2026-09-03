@@ -45,7 +45,7 @@ crontab (clean - see the installer bug below), the wifi watchdog in root's cron,
 logrotate, and a persistent journal.
 
 ---|---|
-| METRO | ✅ live — reachable the home stop departures only, 6-min walk filter |
+| METRO | ✅ live — reachable departures only, 6-min walk filter |
 | WEATHER | ✅ live — local conditions, umbrella rule, adaptive rain bars |
 | TODO | ✅ live — "our to do" list, with leave-by times on timed tasks |
 | ART | ✅ live — a Cleveland Museum painting a day, with veto |
@@ -212,7 +212,7 @@ revisit only if it actually causes a missed train.
 ~~Decide how to render an imminent train (`0'` vs `now`)~~ — **moot.** Absolute
 times never go stale.
 
-**Done when:** the column shows real the home stop departures I can verify
+**Done when:** the column shows real departures I can verify
 against the platform sign.
 
 ---
