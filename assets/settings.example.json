@@ -26,9 +26,9 @@
   },
 
   "weather": {
-    "_comment": "Your town. Open-Meteo needs no key.",
-    "latitude": 52.0,
-    "longitude": 4.5
+    "_comment": "Your town - Open-Meteo needs no key. These are Amsterdam Centraal, a landmark rather than anyone's home; put your own here. Two decimal places is a kilometre and that is plenty for a forecast.",
+    "latitude": 52.38,
+    "longitude": 4.90
   },
 
   "commute": {
