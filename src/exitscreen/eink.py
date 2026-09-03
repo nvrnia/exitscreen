@@ -1,17 +1,17 @@
 """Reduce a rendered frame to what the panel can physically display.
 
-A mode-'L' image has 256 grey levels; the ED097TC2 has 16. Anything we don't
+A mode-'L' image has 256 grey levels, the ED097TC2 has 16. Anything we do not
 reduce ourselves gets reduced by the driver, silently and with no say in how.
 Doing it here means the laptop preview shows the real output, and lets us
-compare the two candidate reductions:
+compare the two candidates:
 
-  grey16  - 16 levels, no dithering. Smooth for tonal art, and the natural
-            partner to the IT8951's GC16 full-quality waveform.
-  bw      - 1 bit with Floyd-Steinberg dithering. Crisper thin lines, at the
-            cost of texture in flat areas; pairs with the faster DU/A2 modes.
+  grey16  16 levels, no dithering. Smooth for tonal art, and the natural partner
+          to the IT8951's GC16 waveform.
+  bw      1 bit with Floyd-Steinberg dithering. Crisper thin lines, at the cost
+          of texture in flat areas. Pairs with the faster DU and A2 modes.
 
-The spec calls for testing both on real hardware, so both stay available.
-Neither function imports IT8951, so this module runs fine on the laptop.
+Both stay available so they can be compared on real glass. Nothing here imports
+IT8951, so it runs fine on the laptop.
 """
 
 from __future__ import annotations
@@ -23,7 +23,6 @@ from PIL import Image
 LEVELS = 16
 STEP = 255 / (LEVELS - 1)  # 17.0
 
-# Nearest-of-16 lookup, applied per pixel.
 _GREY16_LUT = [round(round(v / STEP) * STEP) for v in range(256)]
 
 MODES = ("grey16", "bw", "bw-flat")
@@ -65,24 +64,23 @@ def levels_used(img: Image.Image) -> int:
 def frame_digest(img: Image.Image) -> str:
     """A stable fingerprint of the reduced frame, for the push guard.
 
-    Comparing this digest against the last pushed one means the panel only
-    flashes when something actually changed, and a delayed train still appears
-    sooner than a fixed 10-minute cycle would allow.
+    Comparing this against the last pushed digest means the panel only flashes
+    when something actually changed, and a delayed train still shows up sooner
+    than a fixed cycle would allow.
 
-    This docstring used to claim "roughly half of all renders produce a
-    byte-identical frame". Measured, that is wrong: trains run every 3-4 minutes
-    at the home stop and parse() recomputes against now() rather than against
-    the fetch, so the displayed pair rolls over about every 4 minutes - against a
-    5-minute cadence. During service hours the guard rarely gets to skip. It is
-    still worth having: it is what stops a *static* frame being redrawn, which is
-    most of the night and any quiet stretch.
+    Two things it is easy to get wrong:
 
-    Digest the *reduced* image, not the source: two frames that differ only in
+    Digest the reduced image, not the source. Two frames that differ only in
     tones the panel cannot show are the same frame as far as the panel cares.
 
-    This must be computed on a frame whose "updated" stamp came from the data's
-    fetch time rather than from now(). A stamp rendered from the clock changes
-    every render, so the digest would never match and the guard would do nothing.
+    The frame's "updated" stamp has to come from the data's fetch time, not from
+    now(). A stamp read off the clock changes every render, so the digest would
+    never match and the guard would do nothing.
+
+    It rarely gets to skip during service hours, because trains run every 3-4
+    minutes and parse() recomputes against now, so the displayed pair rolls over
+    about as often as we render. Still worth having: it is what stops a static
+    frame being redrawn, which is most of the night and any quiet stretch.
     """
     if img.mode != "L":
         img = img.convert("L")

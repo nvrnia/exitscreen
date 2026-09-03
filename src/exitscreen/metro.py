@@ -1,21 +1,19 @@
 """Next metro departures from the home stop, via OVapi.
 
-All of the following was verified against the live API on 2026-07-25 and is
-recorded in exitscreen-spec.md; the short version:
+Verified against the live API on 2026-07-25:
 
-  - http, not https. The certificate on v0.ovapi.nl does not match the
-    hostname. The data is public and unauthenticated, so plain http is the
-    honest fix - never disable certificate verification instead.
-  - <your TPC> is a TimingPointCode (one platform), not a StopAreaCode. The
+  - http, not https. The certificate on v0.ovapi.nl does not match the hostname.
+    The data is public and unauthenticated, so plain http is the honest fix.
+    Never turn off certificate verification instead.
+  - The stop code is a TimingPointCode, one platform, not a StopAreaCode. The
     stopareacode endpoint returns an empty object for it.
-  - That platform is already the direction we ride (northbound: D to
-    the interchange, E to the far terminus), so there is no direction
-    filter here. The platform is the filter. <the opposite platform> is the other way.
-  - Times are naive local Amsterdam, with no offset in the string.
-  - Departures that have already left are still present in the feed.
+  - That platform is already the direction we ride, so there is no direction
+    filter here. The platform is the filter.
+  - Times are naive local Amsterdam, no offset in the string.
+  - Trains that have already left are still in the feed.
 
-This module answers "which metro can I catch", not "which metro is next". The
-difference is the walk to the platform - see WALK_TO_PLATFORM_MIN.
+This answers "which metro can I catch", not "which metro is next". The
+difference is the walk, see WALK_TO_PLATFORM_MIN.
 """
 
 from __future__ import annotations
@@ -28,55 +26,45 @@ import requests
 from . import cache, settings
 from .models import Departure
 
-# Your platform, your walk. Personal, so they live in the gitignored settings
-# file rather than in a public repository - see settings.py.
+# Your platform and your walk are personal, so they live in the gitignored
+# settings file rather than in a public repo.
 TPC = settings.get("metro", "tpc")
 URL = "http://v0.ovapi.nl/tpc/{tpc}"
 TZ = ZoneInfo("Europe/Amsterdam")
 
-# OVapi is a free, community-run server. The spec asks for ~10 minutes; this
-# is enforced here rather than left to the caller or to cron.
+# OVapi is a free community server, so poll gently. Enforced here rather than
+# left to the caller or to cron.
 MIN_POLL = 600
 CACHE_KEY = "metro"
 
-# Beyond this the cached data is too stale to be worth showing at all.
+# Past this, cached data is too old to be worth showing at all.
 MAX_STALE = 3600
 
-# Where the last get_departures() answer came from. Set on every call and read by
-# run.py for the log.
+# Where the last answer came from. run.py logs it.
 #
-# This exists because on 22 August the log said "2 departures" right up until it
-# said "0 departures", and there was no way to tell whether those 2 came from a
-# live fetch or from an hour-old cache being served while the wifi was down. The
-# whole outage had to be reasoned about backwards from staleness constants.
-# One word in the log would have answered it immediately.
+# On 22 August the log read "2 departures" right up until it read "0", with no
+# way to tell whether those 2 were live or an hour old with the wifi down. One
+# word would have answered it.
 #
-#   fresh        fetched from OVapi just now, and it carried departures
-#   cached       recent enough that we deliberately did not call out (MIN_POLL)
-#   empty        a well-formed 200 that listed no departures at all. Normal at
-#                3am, suspicious at 21:10. Deliberately NOT cached
-#   stale        the fetch FAILED; serving old data rather than nothing
+#   fresh        just fetched, and it had departures
+#   cached       recent enough that we deliberately did not call out
+#   empty        a well-formed 200 listing nothing. Normal at 3am, suspicious at
+#                21:10. Never cached
+#   stale        the fetch failed; serving old data rather than nothing
 #   unreachable  the fetch failed and the cache is past MAX_STALE
 LAST_SOURCE = "unknown"
 
-# Front door to standing on the platform with the doors open - the walk plus the
-# stairs. Departures closer than this are filtered out entirely.
-#
-# Without this the feed's own "has it left yet" test is the only filter, so a
-# train two minutes away landed in the largest element on the panel while the one
-# you could actually make was demoted to the small grey line underneath.
-#
-# Consequence worth knowing: the hero jumps a whole interval as the threshold is
-# crossed. Abrupt, but true.
+# Front door to standing on the platform, walk plus stairs. Anything sooner is
+# dropped. Without it, a train two minutes away landed in the biggest element on
+# the panel while the one you could actually make sat in the small grey line
+# underneath. The hero jumps a whole interval as the threshold is crossed, which
+# is abrupt but true.
 WALK_TO_PLATFORM_MIN = settings.get("metro", "walk_to_platform_min", 6)
 
-
-# Destinations as the feed gives them are too long for this column.
-#
-# The first departure's route is drawn *beside* the 70px time, which leaves about
-# 180px - so a long terminus name truncated mid-word. The mapping is
-# personal (it depends which lines serve your platform), so it comes from
-# settings rather than being hardcoded here.
+# The feed's destination names are too long for this column. The first
+# departure's route is drawn beside the 70px time, which leaves about 180px, so
+# a long name truncated mid-word. Which names need shortening depends on your
+# platform, so it comes from settings.
 SHORTEN = settings.get("metro", "shorten", {})
 
 
@@ -88,8 +76,8 @@ def short_destination(name: str) -> str:
 def _parse_time(value: str | None) -> datetime | None:
     """OVapi timestamps carry no offset, so attach Amsterdam explicitly.
 
-    Relying on the Pi's system timezone would be fragile: it has no RTC and
-    boots with the wrong clock until NTP catches up.
+    Trusting the Pi's system timezone would be fragile: it has no clock of its
+    own and boots wrong until NTP catches up.
     """
     if not value:
         return None
@@ -105,10 +93,10 @@ def parse(
     limit: int = 2,
     walk_min: int | None = None,
 ) -> list[Departure]:
-    """Turn a raw OVapi response into *reachable* departures, soonest first.
+    """Turn a raw OVapi response into reachable departures, soonest first.
 
-    Reachable, not merely upcoming: anything leaving sooner than the walk to the
-    platform is dropped. See WALK_TO_PLATFORM_MIN.
+    Reachable, not just upcoming: anything leaving sooner than the walk to the
+    platform is dropped.
     """
     now = now or datetime.now(TZ)
     reach = (WALK_TO_PLATFORM_MIN if walk_min is None else walk_min) * 60
@@ -118,7 +106,6 @@ def parse(
 
     upcoming = []
     for p in passes.values():
-        # Prefer the real-time estimate; fall back to the timetable.
         when = _parse_time(p.get("ExpectedDepartureTime")) or _parse_time(
             p.get("TargetDepartureTime")
         )
@@ -126,8 +113,8 @@ def parse(
             continue
 
         seconds = (when - now).total_seconds()
-        # Covers both cases in one test: already left (the feed still lists
-        # these) and leaving too soon to walk to.
+        # Covers both cases at once: already left, which the feed still lists,
+        # and leaving too soon to walk to.
         if seconds < reach:
             continue
 
@@ -143,7 +130,7 @@ def parse(
             )
         )
 
-    # Key order in Passes is not guaranteed chronological, so sort explicitly.
+    # Key order in Passes is not guaranteed chronological.
     upcoming.sort(key=lambda pair: pair[0])
     return [d for _, d in upcoming[:limit]]
 
@@ -151,13 +138,13 @@ def parse(
 def carries_departures(payload: dict) -> bool:
     """Is this a structurally sound answer about our stop?
 
-    fetch() only raises on a network error or a non-200. OVapi is a free
-    community server, and a 200 carrying an empty or wrong-shaped body sails
-    straight through - so without this we would treat junk as a good answer,
-    save it over a working cache, and serve it for the next MIN_POLL.
+    fetch() only raises on a network error or a non-200, and a 200 carrying an
+    empty or wrong-shaped body sails straight through. Without this we would
+    treat junk as a good answer, save it over a working cache, and serve it for
+    the next MIN_POLL.
 
-    Deliberately checks the *shape*, not the count. An empty Passes is possible
-    at 3am and is handled separately - see get_departures().
+    Checks the shape, not the count. An empty Passes is possible at 3am and is
+    handled separately in get_departures().
     """
     stop = payload.get(TPC)
     return isinstance(stop, dict) and isinstance(stop.get("Passes"), dict)
@@ -178,16 +165,15 @@ def fetch(tpc: str = TPC, timeout: float = 15) -> dict:
 def get_departures(limit: int = 2, force: bool = False) -> list[Departure] | None:
     """Reachable departures, using the cache to stay polite and stay alive.
 
-    **None and [] mean different things**, and the difference is the point:
+    None and [] mean different things, and the difference is the point:
 
         [...]  the feed answered; these are the trains you can catch
         []     the feed answered and there is genuinely nothing reachable
-        None   we could not get data at all - unreachable, and the cache has
-               aged past MAX_STALE
+        None   we could not get data at all, and the cache has aged out
 
-    They used to be conflated, so a dead OVapi rendered the same dash as a quiet
-    platform. On a door screen that reads as "no trains tonight" when it actually
-    means "I have no idea", which is the more dangerous of the two.
+    They used to be the same, so a dead OVapi drew the same dash as a quiet
+    platform. On a door screen that reads as "no trains tonight" when it means
+    "I have no idea", which is the more dangerous of the two.
     """
     global LAST_SOURCE
 
@@ -199,30 +185,25 @@ def get_departures(limit: int = 2, force: bool = False) -> list[Departure] | Non
     try:
         payload = fetch()
         if not carries_departures(payload):
-            # A 200 with the wrong shape is a failure, not an answer. Raising
-            # here drops into the cache fallback below rather than caching junk.
+            # Raising here drops into the cache fallback rather than caching junk.
             raise ValueError(f"response has no {TPC}/Passes")
 
         if has_any_passes(payload):
             try:
                 cache.save(CACHE_KEY, payload)
             except Exception:
-                # A cache write failing must not throw away a good fetch. Without
-                # this it would fall through to the except below and serve stale
-                # data, despite holding fresh data in hand.
+                # A failed cache write must not throw away a good fetch.
                 pass
             LAST_SOURCE = "fresh"
             return parse(payload, limit=limit)
 
-        # Well-formed but carrying nothing. Legitimate at 3am, a glitch at 21:10,
-        # and we cannot tell which from the response alone. So: never cache it -
-        # that would poison a good answer for MIN_POLL and turn one bad response
-        # into ten minutes of empty column - and prefer the last real data.
+        # Well formed but carrying nothing. Legitimate at 3am, a glitch at 21:10,
+        # and the response alone cannot tell us which. So never cache it, and
+        # prefer the last real data.
         #
-        # Falling back is safe at 3am *because* parse() filters against the clock:
-        # every cached train has long gone, so it yields [] by itself. At 21:10 it
-        # shows the trains that are really running. The same branch is right in
-        # both cases without having to know which one we are in.
+        # Falling back is safe at 3am because parse() filters against the clock:
+        # every cached train has long gone, so it yields [] by itself. The same
+        # branch is right in both cases without knowing which one we are in.
         stale = cache.load(CACHE_KEY, max_age=MAX_STALE)
         if stale is not None:
             LAST_SOURCE = "empty, using last known"
@@ -231,12 +212,12 @@ def get_departures(limit: int = 2, force: bool = False) -> list[Departure] | Non
         LAST_SOURCE = "empty"
         return parse(payload, limit=limit)
     except Exception:
-        # Network down, API down, garbage response - fall back to whatever we
-        # last saw, as long as it is not hopelessly stale. Minutes are
-        # recomputed against now, so a cached payload still counts down.
+        # Fall back to whatever we last saw, as long as it is not hopelessly
+        # old. Minutes are recomputed against now, so a cached payload still
+        # counts down.
         stale = cache.load(CACHE_KEY, max_age=MAX_STALE)
         if stale is not None:
             LAST_SOURCE = "stale"
             return parse(stale, limit=limit)
         LAST_SOURCE = "unreachable"
-        return None  # not "no trains" - "no idea". See the docstring.
+        return None  # not "no trains", "no idea". See the docstring.
