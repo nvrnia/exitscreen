@@ -3,7 +3,7 @@
 # machine setup; this is the one you run every time after that.
 #
 #   deploy/push.sh                          # default host
-#   deploy/push.sh exitscreen@192.168.0.112 # or name one
+#   deploy/push.sh exitscreen@<pi-ip>       # or name one
 #   deploy/push.sh --watchdog               # also install the wifi watchdog
 #
 # Safe to re-run.
