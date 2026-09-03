@@ -29,18 +29,20 @@ from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
+
+from exitscreen import settings  # noqa: E402
 OUT = ROOT / "assets" / "timetable.json"
 
-# the connecting bus line, the interchange -> the line terminus. Found by searching routes.txt
-# for your line's short_name with agency the operator; six other operators also run a "40".
-ROUTE_ID = "<route id>"
+# Which route and which two platforms - personal, so they come from the
+# gitignored settings file. To find yours: search routes.txt for your line's
+# short_name and your operator, then read a sample trip's stop_times to get the
+# PHYSICAL platform ids. Matching on stop name alone finds a location_type=1
+# parent area that appears in no stop_times row at all.
+ROUTE_ID = settings.get("commute", "gtfs_route_id")
 OUTBOUND = "0"
-
-# Physical platforms, NOT the parent stop areas. stop_times.txt references these;
-# matching on "the university stop" alone finds a location_type=1 area that appears in no
-# stop_times row at all.
-BOARD_STOP = "<board stop id>"    # the city, the interchange platform
-ALIGHT_STOP = "<alight stop id>"   # the university stop (outbound side)
+BOARD_STOP = settings.get("commute", "board_stop_id")
+ALIGHT_STOP = settings.get("commute", "alight_stop_id")
 
 
 def rows(z: zipfile.ZipFile, name: str):

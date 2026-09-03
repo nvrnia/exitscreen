@@ -61,14 +61,14 @@ Typical destinations: **the interchange** and **the far terminus** (both served 
   match the hostname, so any verifying HTTP client refuses the connection. Plain
   HTTP returns 200. Acceptable here: public departure data, no auth, no secrets.
   Do **not** work around this by disabling certificate verification.
-- **The stop code is `<stop code>`, and it is a TimingPointCode — not a StopAreaCode.**
-  `tpc/<stop code>` returns a full payload; `stopareacode/<stop code>` returns an empty
+- **The stop code is `<your TPC>`, and it is a TimingPointCode — not a StopAreaCode.**
+  `tpc/<your TPC>` returns a full payload; `stopareacode/<your TPC>` returns an empty
   object. The drgl.nl lead was correct, but only via the `tpc/` endpoint.
-- **`<stop code>` is already the direction we ride.** It is the northbound platform:
+- **`<your TPC>` is already the direction we ride.** It is the northbound platform:
   every pass is `LineDirection 2`, line **D → the interchange** and line
   **E → the far terminus**, alternating roughly every 7–8 minutes.
   No direction filtering is needed — the platform *is* the filter.
-- The opposite platform is **`<stop code>-OPPOSITE`** (D → De Akkers, E → Slinge). Not used.
+- The opposite platform is **`<the opposite platform>`** (D → De Akkers, E → Slinge). Not used.
 - Confirmed field names on a live pass:
   `LinePublicNumber`, `DestinationName50`, `TargetDepartureTime`,
   `ExpectedDepartureTime`, `TransportType` (`"METRO"`), `LineDirection`.
@@ -81,7 +81,7 @@ Typical destinations: **the interchange** and **the far terminus** (both served 
   had already left 1.9 minutes earlier, so upcoming-only filtering is required.
 
 ### Implementation notes
-- Poll the single TPC `<stop code>`; no direction filter needed (see above).
+- Poll the single TPC `<your TPC>`; no direction filter needed (see above).
 - Drop passes whose `ExpectedDepartureTime` is in the past, then sort — the
   `Passes` object's key order should not be trusted as chronological.
 - Show the next ~2 departures.

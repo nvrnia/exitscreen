@@ -6,11 +6,11 @@ recorded in exitscreen-spec.md; the short version:
   - http, not https. The certificate on v0.ovapi.nl does not match the
     hostname. The data is public and unauthenticated, so plain http is the
     honest fix - never disable certificate verification instead.
-  - <stop code> is a TimingPointCode (one platform), not a StopAreaCode. The
+  - <your TPC> is a TimingPointCode (one platform), not a StopAreaCode. The
     stopareacode endpoint returns an empty object for it.
   - That platform is already the direction we ride (northbound: D to
     the interchange, E to the far terminus), so there is no direction
-    filter here. The platform is the filter. <stop code>-OPPOSITE is the other way.
+    filter here. The platform is the filter. <the opposite platform> is the other way.
   - Times are naive local Amsterdam, with no offset in the string.
   - Departures that have already left are still present in the feed.
 
@@ -25,10 +25,12 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-from . import cache
+from . import cache, settings
 from .models import Departure
 
-TPC = "<stop code>"  # the home stop, northbound
+# Your platform, your walk. Personal, so they live in the gitignored settings
+# file rather than in a public repository - see settings.py.
+TPC = settings.get("metro", "tpc")
 URL = "http://v0.ovapi.nl/tpc/{tpc}"
 TZ = ZoneInfo("Europe/Amsterdam")
 
@@ -60,29 +62,22 @@ LAST_SOURCE = "unknown"
 # Front door to standing on the platform with the doors open - the walk plus the
 # stairs. Departures closer than this are filtered out entirely.
 #
-# Without this the feed's own "has it left yet" test is the only filter, so at
-# 10:50 the hero clock showed 10:52: a train you cannot reach. That put an
-# uncatchable departure in the largest element on the panel and demoted the real
-# answer to the small grey line underneath, which is exactly backwards.
+# Without this the feed's own "has it left yet" test is the only filter, so a
+# train two minutes away landed in the largest element on the panel while the one
+# you could actually make was demoted to the small grey line underneath.
 #
 # Consequence worth knowing: the hero jumps a whole interval as the threshold is
-# crossed. At 10:46 it reads 10:52; a minute later that train is out of reach and
-# it reads 10:57. Abrupt, but true.
-WALK_TO_PLATFORM_MIN = 6
+# crossed. Abrupt, but true.
+WALK_TO_PLATFORM_MIN = settings.get("metro", "walk_to_platform_min", 6)
 
 
-# Destinations as OVapi gives them are too long for this column.
+# Destinations as the feed gives them are too long for this column.
 #
-# The "CS" suffix went too: the first departure's route is drawn *beside* the
-# 70px time, which leaves ~180px, and "E -> the terminus" measured 187 - seven
-# pixels over, so it truncated to "the city...". Every northbound service from
-# this platform terminates at a Centraal station, so the suffix carried no
-# information anyway, and dropping it beats having two abbreviations for one place.
-SHORTEN = {
-    "the interchange": "the city",
-    "the far terminus": "Den Haag",
-    "the city Slinge": "Slinge",
-}
+# The first departure's route is drawn *beside* the 70px time, which leaves about
+# 180px - so a long terminus name truncated to "the city...". The mapping is
+# personal (it depends which lines serve your platform), so it comes from
+# settings rather than being hardcoded here.
+SHORTEN = settings.get("metro", "shorten", {})
 
 
 def short_destination(name: str) -> str:

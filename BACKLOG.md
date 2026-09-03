@@ -24,7 +24,7 @@ Size: **S** ≈ one sitting · **M** ≈ a session · **L** ≈ multiple session
 | WEATHER | ✅ the city conditions, umbrella rule, adaptive rain bars |
 | TODO | ✅ **today's tasks only**, with leave-by times on `#40m`-tagged ones |
 | ART | ✅ a Cleveland Museum painting a day, with veto |
-| PANEL | ✅ Pi 3A+ at <pi ip>, rounded 48px corners |
+| PANEL | ✅ Pi 3A+ at <your Pi's IP>, rounded 48px corners |
 
 **Schedule:** clear at 05:59, renders `*/5` 06:00–21:55, final render 22:00,
 `@reboot` waits for NTP. Moved an hour earlier for a ~07:00 departure.
@@ -138,12 +138,12 @@ chosen from rendered candidates in `font_lab.py`.
 
 ## EPIC 1 — Metro (OVapi) 🔶 mostly done
 
-- [x] ⚠️ Found the working code: **`<stop code>`**, and it is a **TimingPointCode**,
+- [x] ⚠️ Found the working code: **`<your TPC>`**, and it is a **TimingPointCode**,
       not a StopAreaCode (`stopareacode/` returns an empty object for it)
 - [x] ⚠️ Dumped a live response; all spec field names confirmed
-- [x] Decided single TPC. It turned out `<stop code>` **is already our direction**
+- [x] Decided single TPC. It turned out `<your TPC>` **is already our direction**
       (northbound: D→the interchange, E→the far terminus), so no direction
-      filter is needed at all. `<stop code>-OPPOSITE` is the opposite platform
+      filter is needed at all. `<the opposite platform>` is the opposite platform
 - [x] `metro.py` — fetch, filter, sort, next N as `Departure` objects
 - [x] Minutes from `ExpectedDepartureTime`; real-time delays confirmed present
 - [x] Disk cache + 10-minute minimum poll interval, enforced in the module
@@ -301,7 +301,7 @@ see the leave-by section under EPIC 3. A live clock is still rejected.
       (matters on the Pi, where cron or systemd may supply values directly)
 - [x] `tools/ticktick_auth.py` — two-step OAuth2, `tasks:read` only
 - [x] Access token written to `.env`
-- [x] Project id saved: **"our to do"** `<project id>`
+- [x] Project id saved: **"our to do"** `<your TickTick project id>`
 - [x] ⚠️ Live task JSON dumped and field names confirmed
 - [x] `todo.py` — fetch, sort, titles + total for the "+N more" line
 - [x] Falls back to a stale list on failure, then to "nothing to do"
@@ -1128,5 +1128,5 @@ light is guessing dressed up as progress.
 
 ## Resolved, kept for reference
 
-- **Stoparea vs single TPC** → single TPC `<stop code>`, which turned out to
+- **Stoparea vs single TPC** → single TPC `<your TPC>`, which turned out to
   already be the direction we ride, so no direction filter is needed

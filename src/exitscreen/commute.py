@@ -1,15 +1,15 @@
-"""Which metro and bus get me to class on time.
+"""Which onward service gets me there on time.
 
-Answers one question: given today's class, which bus from the interchange
-reaches the university stop in time, and which metro from the home stop makes that bus.
+Answers one question: given today's commitment, which scheduled service reaches
+the destination in time, and which departure from the home stop makes it.
 
 Three inputs, deliberately separate:
-  assets/uni_schedule.json  the weekly class times, hand-edited
-  assets/timetable.json         the timetable, generated from GTFS
-  live metro departures     passed in, so this module needs no network
+  assets/settings.json   your stops, timings and weekly schedule - GITIGNORED
+  assets/timetable.json      the timetable, generated from GTFS - gitignored
+  live departures        passed in, so this module needs no network
 
-The bus timetable is scheduled rather than live: OVapi's live endpoints cannot
-reach these stops (see BACKLOG), and you plan a departure against the schedule
+The second leg is scheduled rather than live: OVapi's live endpoints cannot
+reach those stops (see BACKLOG), and you plan a departure against the schedule
 anyway - delays matter at the stop, not at your front door.
 """
 
@@ -20,27 +20,41 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
+from . import settings
+
 ASSETS = Path(__file__).resolve().parents[2] / "assets"
-SCHEDULE = ASSETS / "uni_schedule.json"
 TIMETABLE = ASSETS / "timetable.json"
 
-# Measured from the GTFS feed across 2,728 real journeys: median 7.0 minutes,
-# range 6.5-7.0. Consistent enough to treat as fixed.
-METRO_RIDE_MIN = 7
+def _tuning(key: str, default: int) -> int:
+    """One commute number from settings, falling back if the section is absent.
 
-# Metro platform at the interchange to the bus at perron AA. NOT measured -
-# an estimate, and the one number here most worth correcting from experience.
-TRANSFER_MIN = 6
+    Absent is legitimate here - not everyone has a second leg - so unlike the
+    rest of settings this does not fail closed. plan() returns None in that case
+    and the panel simply renders without a commute line.
+    """
+    try:
+        return settings.section("commute").get(key, default)
+    except settings.SettingsError:
+        return default
 
-# Standing time at the stop before the bus leaves, on top of that walk. This is a
-# preference rather than a measurement, so it lives in uni_schedule.json as
-# bus_buffer_min; this is only the fallback if the file omits it. The point is to
-# arrive with the bus not yet there, rather than jogging onto it.
-DEFAULT_BUS_BUFFER_MIN = 8
+
+# Measured from the GTFS feed, not guessed: the ride time is the median of
+# thousands of real journeys in the published timetable.
+RIDE_MIN = _tuning("ride_min", 7)
+
+# Platform-to-platform walk where you change. The one number here that is an
+# estimate rather than a measurement, and the first to correct from experience.
+TRANSFER_MIN = _tuning("transfer_min", 6)
+
+# Standing time before the connection leaves, on top of that walk. A preference,
+# not a measurement: arrive with the service not yet there rather than jogging
+# onto it.
+DEFAULT_BUS_BUFFER_MIN = _tuning("buffer_min", 8)
 
 # How close a live departure must be to the deadline before it is worth naming.
-# Metros run every 3-4 minutes, so anything inside this is "the one you want";
-# beyond it we show the deadline instead of an arbitrary early train.
+# Services from the home stop run every few minutes, so anything inside this is
+# "the one you want"; beyond it we show the deadline instead of an arbitrary
+# early departure.
 NAMEABLE_WINDOW_MIN = 20
 
 DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
@@ -78,9 +92,17 @@ def _clock(minutes: int) -> str:
     return f"{minutes // 60:02d}:{minutes % 60:02d}"
 
 
+def _schedule() -> dict | None:
+    """The commute block from settings, or None if there is no second leg."""
+    try:
+        return settings.section("commute")
+    except settings.SettingsError:
+        return None
+
+
 def class_start_for(day: date, schedule: dict | None = None) -> str | None:
-    """Today's class start, or None on a free day."""
-    schedule = schedule if schedule is not None else _load(SCHEDULE)
+    """Today's start time, or None on a free day."""
+    schedule = schedule if schedule is not None else _schedule()
     if not schedule:
         return None
     return (schedule.get("weekly") or {}).get(DAYS[day.weekday()])
@@ -113,7 +135,7 @@ def plan(day: date, now: datetime | None, departures, schedule=None, timetable=N
     None when the feed is unreachable. Only used to pick which metro to name.
     """
     now = now or datetime.now()
-    schedule = schedule if schedule is not None else _load(SCHEDULE)
+    schedule = schedule if schedule is not None else _schedule()
     start = class_start_for(day, schedule)
     if not start:
         return None                      # free day: the column stays as it was
@@ -121,8 +143,7 @@ def plan(day: date, now: datetime | None, departures, schedule=None, timetable=N
     # A FLOOR, not a target. Buses are ~30 minutes apart, so treating it as an
     # exact deadline threw away a bus arriving 29 minutes before class - one
     # minute short of a 30-minute rule - and took one an hour early instead.
-    early = (schedule or {}).get("arrive_at_least_min",
-                                 (schedule or {}).get("arrive_early_min", 20))
+    early = (schedule or {}).get("arrive_at_least_min", 20)
     arrive_by = _mins(start) - early
 
     # The latest bus that still clears the floor. Latest, not earliest: no point
@@ -136,7 +157,7 @@ def plan(day: date, now: datetime | None, departures, schedule=None, timetable=N
     # bus departure, minus standing-around slack, minus the platform-to-platform
     # walk, minus the ride itself.
     buffer_min = (schedule or {}).get("bus_buffer_min", DEFAULT_BUS_BUFFER_MIN)
-    latest_metro = _mins(bus_dep) - buffer_min - TRANSFER_MIN - METRO_RIDE_MIN
+    latest_metro = _mins(bus_dep) - buffer_min - TRANSFER_MIN - RIDE_MIN
 
     # Name a real departure only when one sits close to the deadline. The feed
     # reaches ~85 minutes ahead, so for a class this afternoon there simply is no
@@ -153,7 +174,7 @@ def plan(day: date, now: datetime | None, departures, schedule=None, timetable=N
 
     wait = 0
     if metro_departs:
-        wait = _mins(bus_dep) - (_mins(metro_departs) + METRO_RIDE_MIN + TRANSFER_MIN)
+        wait = _mins(bus_dep) - (_mins(metro_departs) + RIDE_MIN + TRANSFER_MIN)
 
     return Commute(
         class_start=start,

@@ -16,14 +16,14 @@ from __future__ import annotations
 
 import requests
 
-from . import cache
+from . import cache, settings
 from .models import Weather
 
 URL = "https://api.open-meteo.com/v1/forecast"
 
-# the city. Close enough for a forecast; the metro stop
-# itself is a little way off.
-LAT, LON = 0.00, 0.00
+# Your coordinates, from the gitignored settings file. Open-Meteo needs no key.
+LAT = settings.get("weather", "latitude")
+LON = settings.get("weather", "longitude")
 
 PARAMS = {
     "latitude": LAT,

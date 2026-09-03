@@ -19,3 +19,13 @@ __pycache__/
 .idea/
 Thumbs.db
 desktop.ini
+
+# Personal settings: where you live, when you travel. A timetable plus a station
+# is a public statement of when a specific person leaves a specific building.
+# settings.example.json is the committed template.
+assets/settings.json
+assets/uni_schedule.json
+
+# Generated from the 184MB national GTFS feed by tools/build_bus_timetable.py.
+# Derived data, and it names the stops you actually use.
+assets/timetable.json

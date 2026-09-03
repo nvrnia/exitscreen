@@ -1,0 +1,67 @@
+{
+  "_comment": [
+    "Copy this to settings.json and fill in your own values.",
+    "settings.json is gitignored - it holds where you live and when you travel,",
+    "which is not something to publish. See src/exitscreen/settings.py.",
+    "",
+    "The values below are placeholders and will not work as they are."
+  ],
+
+  "metro": {
+    "_comment": [
+      "tpc: the OVapi TimingPointCode for YOUR platform - one platform, not a",
+      "  station, and already the direction you ride. Find it at",
+      "  http://v0.ovapi.nl/tpc/<code> and check the destinations look right.",
+      "walk_to_platform_min: front door to standing on the platform, including",
+      "  stairs. Departures sooner than this are hidden - a train you cannot",
+      "  reach is worse than no train.",
+      "shorten: destination names as the feed gives them are too long for the",
+      "  column. Map them to something that fits."
+    ],
+    "tpc": "00000000",
+    "walk_to_platform_min": 6,
+    "shorten": {
+      "Some Long Terminus Name": "Short Name"
+    }
+  },
+
+  "weather": {
+    "_comment": "Your town. Open-Meteo needs no key.",
+    "latitude": 52.0,
+    "longitude": 4.5
+  },
+
+  "commute": {
+    "_comment": [
+      "Optional. Remove this whole section if you have no second leg.",
+      "",
+      "gtfs_route_id / board_stop_id / alight_stop_id come from the national",
+      "  GTFS feed - tools/build_bus_timetable.py explains how to find them.",
+      "ride_min: measured from the feed, not guessed.",
+      "transfer_min: platform-to-platform walk where you change.",
+      "buffer_min: slack before the connection leaves. Being early is free;",
+      "  missing it is not.",
+      "arrive_at_least_min: the SMALLEST acceptable margin before you must be",
+      "  there. A floor, not a target - the planner takes the LATEST service",
+      "  that still clears it.",
+      "weekly: start times, or null on a free day."
+    ],
+    "destination": "Your Destination",
+    "gtfs_route_id": "000000",
+    "board_stop_id": "0000000",
+    "alight_stop_id": "0000000",
+    "ride_min": 7,
+    "transfer_min": 6,
+    "buffer_min": 8,
+    "arrive_at_least_min": 20,
+    "weekly": {
+      "mon": "09:00",
+      "tue": null,
+      "wed": "13:00",
+      "thu": null,
+      "fri": "11:00",
+      "sat": null,
+      "sun": null
+    }
+  }
+}
