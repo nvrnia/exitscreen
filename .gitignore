@@ -29,3 +29,6 @@ assets/uni_schedule.json
 # Generated from the 184MB national GTFS feed by tools/build_bus_timetable.py.
 # Derived data, and it names the stops you actually use.
 assets/timetable.json
+
+# working notes for me and the assistant, not part of the project
+CLAUDE.md

@@ -2,7 +2,11 @@
 
 A DIY e-ink "what to know before I leave" display for the front door.
 This file is the single source of truth. It grows as we research each block.
-Status tags: ✅ decided · 🔶 in progress · ⬜ not started · ⚠️ needs live verification
+This is the original design document, written before any of it was built.
+Some of it was overtaken by what actually happened, most obviously the art
+block: it describes AI generation, and the panel ended up using real paintings
+from a museum collection. `BACKLOG.md` is the running log and is the accurate
+one where the two disagree.
 
 ---
 
@@ -15,7 +19,7 @@ Status tags: ✅ decided · 🔶 in progress · ⬜ not started · ⚠️ needs 
   - **VCOM = -1.81** (must be passed to the driver; wrong value degrades the panel).
 - Plugged in permanently by the door. Landscape orientation.
 
-## Driver / rendering approach ✅ decided (method) 🔶 (not yet built)
+## Driver / rendering approach (method decided, not yet built)
 
 - Hardware verified working with Waveshare's C demo (`sudo ./epd -1.81 0` → grey bars).
 - **For the actual project, use Python** with the **GregDMeyer/IT8951** library (MIT, community standard).
@@ -26,7 +30,7 @@ Status tags: ✅ decided · 🔶 in progress · ⬜ not started · ⚠️ needs 
 
 ---
 
-## Layout ✅ decided
+## Layout (decided)
 
 Landscape **1200 × 825**, minimal black & white, "cute daily print by the door" vibe.
 Hero-art layout:
@@ -42,12 +46,12 @@ Keep the strip thin so the art gets maximum room, but the metro number stays lar
 
 ---
 
-## Block 1 — METRO 🔶 in progress
+## Block 1 — METRO (in progress)
 
 **Location:** user boards at **the home stop** - an underground metro station served by two lines.
 Typical destinations: **the interchange** and **the far terminus** (both served by line E; D also runs through here).
 
-### Data source ✅ decided: OVapi (`v0.ovapi.nl`)
+### Data source (decided): OVapi (`v0.ovapi.nl`)
 - Free, community-run public API fed by NDOV Loket. Covers all Dutch operators, including my local one.
 - **No API key, no OAuth** — just HTTP GET a URL and parse JSON. (Big win vs TickTick's OAuth.)
 - Two endpoint styles:
@@ -55,7 +59,7 @@ Typical destinations: **the interchange** and **the far terminus** (both served 
   - `https://v0.ovapi.nl/stopareacode/<code>` — groups all platforms of a station together (both directions).
 - Response contains a `Passes` object: each pass has line number, destination, and **TargetDepartureTime** / **ExpectedDepartureTime** (real-time). Compute "minutes from now" = ExpectedDepartureTime − now.
 
-### ✅ VERIFIED LIVE (2026-07-25, against the real API)
+### Verified live (2026-07-25, against the real API)
 
 - **Use `http://`, not `https://`.** The TLS certificate on `v0.ovapi.nl` does not
   match the hostname, so any verifying HTTP client refuses the connection. Plain
@@ -90,11 +94,11 @@ Typical destinations: **the interchange** and **the far terminus** (both served 
 
 ---
 
-## Block 2 — WEATHER ✅ decided
+## Block 2 — WEATHER (decided)
 
 **Location:** set `weather.lat` / `weather.lon` in `assets/settings.json`. Two decimal places is plenty - it is a weather forecast, not a survey, and more precision only pins down where you live.
 
-### Data source ✅ decided: Open-Meteo (`api.open-meteo.com`)
+### Data source (decided): Open-Meteo (`api.open-meteo.com`)
 - Free, **no API key, no signup, no meaningful rate limits** (10k calls/day free tier — we use a handful).
 - Blends national weather models incl. **KNMI** (Dutch met office) → accurate over the Netherlands.
 - One GET returns everything, clean JSON, arrays index-aligned with their `time` array.
@@ -114,7 +118,7 @@ https://api.open-meteo.com/v1/forecast?latitude=<lat>&longitude=<lon>&current=te
 - Units default to metric/°C/km-h for a European location — confirm in the response; can force with `&wind_speed_unit=kmh&temperature_unit=celsius`.
 - The **"bring this"** rules (Logic epic) consume this data: high upcoming precip prob → umbrella icon; low temp → jacket; high wind → wind icon. Design the icon set as part of the art/render style (cross-hatch B&W to match).
 
-## Block 3 — TODO (TickTick) ✅ decided
+## Block 3 — TODO (TickTick) (decided)
 
 Show tasks from **one dedicated TickTick list** (e.g. "Exitscreen" or "Errands"). One-list design is deliberate — it sidesteps the API's biggest limitation (see quirks).
 
@@ -142,9 +146,9 @@ Show tasks from **one dedicated TickTick list** (e.g. "Exitscreen" or "Errands")
 - **No webhooks** → **poll** on a timer (same cron pattern as the other blocks). ~15–30 min is plenty.
 - Community reference (structure only, not required): `lazeroffmichael/ticktick-py`.
 - Token may expire / need refresh — check whether the token response includes a refresh_token and handle re-auth gracefully (fall back to last good list if auth fails).
-- ⚠️ VERIFY: exact field names in the project/task JSON on a live response before writing the parser.
+- Check: exact field names in the project/task JSON on a live response before writing the parser.
 
-## Block 4 — DAILY ART 🔶 in progress (identity defined, pipeline TBD)
+## Block 4 — DAILY ART (in progress, identity defined, pipeline TBD)
 
 The soul of the display: one AI-generated B&W illustration per day, driven by the day's data.
 
@@ -165,7 +169,7 @@ The soul of the display: one AI-generated B&W illustration per day, driven by th
 - **Weather-led**, blended with season/time-of-year and general day feel.
 - **Literalness: between literal and suggestive.** A rainy day reads wetter/moodier and *may* show rain, but don't force a 1:1 "weather icon as a scene." Aim for mood-match over literal depiction.
 
-### PIPELINE 🔶 (model chosen, prompt/convert TBD)
+### PIPELINE (model chosen, prompt and convert TBD)
 
 **Image model — DECISION PARKED for later** (art block deferred; everything else can be built without it).
 When picking up: the ART BIBLE below is fully defined, only the model/pipeline is open.
@@ -173,7 +177,7 @@ When picking up: the ART BIBLE below is fully defined, only the model/pipeline i
   - **Cloudflare Workers AI — recommended free option.** Ongoing free tier (~10k "neurons"/day, resets daily, no credit card), and it **hosts FLUX Schnell** (the open version of the model below). Stable because there's a real account behind it. One image/day is trivial against the quota. Sign up at dash.cloudflare.com → Workers AI API token.
   - **Pollinations.ai** — no key, no signup at all (`image.pollinations.ai/prompt/<prompt>`). Dead simple, but no uptime guarantee / rate limits shift. Fine for hobby use (missed day = reuse yesterday's).
 - **Paid route (~$1/mo)** if free tiers annoy: FLUX via Black Forest Labs API / fal.ai / Replicate. Best stylized-illustration quality among API models; Midjourney ruled out (no real API).
-- ⚠️ **~70% on which model nails cross-hatch specifically.** Prompt-test the actual style string on whichever provider before committing.
+- **~70% on which model nails cross-hatch specifically.** Prompt-test the actual style string on whichever provider before committing.
 
 **Prompt builder:**
 - Constant **style string** (from the ART BIBLE above) + variable **day data** (weather, season, maybe a scene noun).
