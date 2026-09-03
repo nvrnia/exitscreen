@@ -195,6 +195,23 @@ def _draw_metro(d, f, data, x=None, right=None):
               f.meta, T.MUTED)
 
 
+def _weather_lines(w) -> list[str]:
+    """The small print under the bars. Order matters: what to carry, then why."""
+    lines = []
+    if w.show_bars and w.first_rain_at:
+        # An umbrella is useless in a blow, so the advice changes rather than
+        # stubbornly recommending one.
+        advice = "take a coat" if w.blustery else "take umbrella"
+        lines.append(f"rain {w.first_rain_at} · {advice}")
+    if w.blustery:
+        # The gust figure is the one you can act on. Beaufort is what trips the
+        # blustery flag, not the message, so it only shows if there is no gust.
+        lines.append(
+            f"gusts {round(w.gust_kmh)} km/h" if w.gust_kmh else f"wind {w.beaufort}"
+        )
+    return lines
+
+
 def _draw_weather(d, f, data, x=None, right=None):
     if x is None:
         x, right = T.column(1)
@@ -238,28 +255,10 @@ def _draw_weather(d, f, data, x=None, right=None):
 
     if w.show_bars:
         _draw_rain_bars(d, x, T.BARS_TOP, w.rain_hours)
-        if w.first_rain_at:
-            # An umbrella is useless in a blow, so the advice changes rather than
-            # stubbornly recommending one.
-            advice = "take a coat" if w.blustery else "take umbrella"
-            _text(
-                d,
-                x,
-                T.WEATHER_LINE_1,
-                _fit(d, f"Rain {w.first_rain_at} — {advice}", f.small, right - x),
-                f.small,
-                T.MUTED,
-            )
-    if w.blustery:
-        gust = f" · gusts {round(w.gust_kmh)}" if w.gust_kmh else ""
-        _text(
-            d,
-            x,
-            T.WEATHER_LINE_2,
-            _fit(d, f"wind {w.beaufort}{gust}", f.small, right - x),
-            f.small,
-            T.MUTED,
-        )
+
+    for i, line in enumerate(_weather_lines(w)):
+        _text(d, x, T.WEATHER_LINE_1 + i * T.WEATHER_LINE_STEP,
+              _fit(d, line, f.small, right - x), f.small, T.MUTED)
 
 
 def _draw_rain_bars(d, x, y, hours, bar_w=13, gap=5):

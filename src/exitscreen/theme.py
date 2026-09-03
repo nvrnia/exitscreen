@@ -143,6 +143,9 @@ BARS_TOP = ROW_TOP + 104  # 661
 BARS_H = 22
 WEATHER_LINE_1 = ROW_TOP + 160  # 717  "Rain now - take umbrella"
 WEATHER_LINE_2 = ROW_TOP + 186  # 743  "wind 6 - gusts 61"
+WEATHER_LINE_STEP = WEATHER_LINE_2 - WEATHER_LINE_1  # 26
+# Lines are drawn consecutively from WEATHER_LINE_1, not at fixed slots:
+# a dry but blustery day used to leave a gap where the rain line would be.
 
 # todo: an even rhythm of its own, four tasks plus an overflow line
 TODO_FIRST_BASE = ROW_TOP + 54  # 611
